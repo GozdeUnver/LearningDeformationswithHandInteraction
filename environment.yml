@@ -1,0 +1,14 @@
+name: .at3dcv-point-correspondence
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - ipykernel
+  - meshplot
+  - numpy
+  - python==3.10
+  - scikit-learn
+  - tqdm
+  - pip:
+    - potpourri3d
+    - robust-laplacian
