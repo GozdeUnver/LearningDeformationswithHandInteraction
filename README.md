@@ -1,5 +1,11 @@
 ## Learning Deformations with Hand Interaction Project
 
+### Bijective Correspondences
+This directory contains bijective correspondences between deformed and non-deformed meshes.
+`deformed_1-<num>_bijective_<refinement_method>.npy` stores the correspondences of deformed mesh named `<num>`. `<refinement_method>` can be icp or zooming out:.
+
+`nondeformed_1-<num>_bijective_<refinement_method>.npy` stores the correspondences of non-deformed mesh "1". `<refinement_method>` can be icp or zooming out:.
+
 ### Deformed-to-Non-deformed Corresponsences
 This directory contains the mapping from the deformed mesh to the non-deformed mesh. 
 
