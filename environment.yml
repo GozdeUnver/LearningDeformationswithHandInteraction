@@ -9,6 +9,7 @@ dependencies:
   - python==3.10
   - scikit-learn
   - tqdm
+  - trimesh
   - pip:
     - potpourri3d
     - robust-laplacian
