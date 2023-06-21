@@ -1,0 +1,38 @@
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(batch_size=32, class_choice=None, dataset='shapenetpart', dropout=0.5, emb_dims=1024, epochs=200, eval=True, exp_name='partseg_eval', k=40, lr=0.001, model='dgcnn', model_path='pretrained/model.partseg.t7', momentum=0.9, no_cuda=False, num_points=2048, scheduler='cos', seed=1, test_batch_size=16, use_sgd=True, visu='airplane_0', visu_format='ply')
+Using CPU
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=32, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=32, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=32, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=32, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=4, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=2, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=1, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=2, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
+Namespace(exp_name='partseg_eval', model='dgcnn', dataset='shapenetpart', class_choice=None, batch_size=2, test_batch_size=16, epochs=200, use_sgd=True, lr=0.001, momentum=0.9, scheduler='cos', no_cuda=False, seed=1, eval=True, num_points=2048, dropout=0.5, emb_dims=1024, k=40, model_path='pretrained/model.partseg.t7', visu='airplane_0', visu_format='ply')
+Using GPU : 0 from 1 devices
