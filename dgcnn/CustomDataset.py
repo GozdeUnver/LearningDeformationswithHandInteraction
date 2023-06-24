@@ -7,15 +7,16 @@ import os
 import cv2
 import open3d
 class CustomDataset(torch.utils.data.Dataset):
-    def __init__(self,path=None,deformation_path=None,num_points=2048):
+    def __init__(self,path=None,deformation_path=None,num_points=2048, split_vectors=False):
         super().__init__()
-        self.target_paths = ["./data/pointcloud_sampled/YellowToy01/targets/deformed_2_correspondences_zoom_2048.ply"]
         self.input_paths = ["./data/pointcloud_sampled/YellowToy01/inputs/non_deformed_2_correspondences_zoom_2048.ply"]
+        self.target_paths = ["./data/pointcloud_sampled/YellowToy01/targets/deformed_2_correspondences_zoom_2048.ply"]
         self.deformation_nondeformed=["./data/pointcloud_sampled/YellowToy01/deformations/non_deformed_2_correspondences_zoom_2048_paired_648.ply"]
         self.deformation_deformed=["./data/pointcloud_sampled/YellowToy01/deformations/deformed_2_correspondences_zoom_2048_paired_648.ply"]
         self.num_points=num_points
-        self.seg_num_all = 3
-        self.seg_start_index = 0
+        self.target_num_all = 3
+        self.target_start_index = 0
+        self.split_vectors = split_vectors
             
     def __getitem__(self, index):
         index = 0 # THIS IS BECAUSE OF BATCHNORMS - CHANGE WHEN NOT OVERFITTING!
@@ -30,9 +31,11 @@ class CustomDataset(torch.utils.data.Dataset):
         mesh_index=np.where(input_mesh == non_deformed_mesh[max_index])
         deformations=np.zeros(input_mesh.shape)
         deformations[mesh_index,:] =deformation_vector
-        input_mesh = np.concatenate([input_mesh, deformations], axis=1)
-
-        return input_mesh, target_mesh
+        if self.split_vectors:
+            return (input_mesh, deformations), target_mesh
+        else:
+            input_mesh = np.concatenate([input_mesh, deformations], axis=1)
+            return input_mesh, target_mesh
     
     def __len__(self):
         return 2 * len(self.target_paths) # THIS IS BECAUSE OF BATCHNORMS - CHANGE WHEN NOT OVERFITTING!
