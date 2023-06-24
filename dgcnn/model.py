@@ -206,10 +206,33 @@ class Transform_Net(nn.Module):
         x = F.leaky_relu(self.bn4(self.linear2(x)), negative_slope=0.2)     # (batch_size, 512) -> (batch_size, 256)
 
         x = self.transform(x)                   # (batch_size, 256) -> (batch_size, 3*3)
-        x = x.view(batch_size, 3, 3)            # (batch_size, 3*3) -> (batch_size, 3, 3)
-
+        #x = x.view(batch_size, 3, 3)            # (batch_size, 3*3) -> (batch_size, 3, 3)
+        x=x.view(batch_size,6,6) #new
         return x
 
+class CustomHeader(nn.Module):
+    def __init__(self, args):
+        super(CustomHeader, self).__init__()
+        self.args = args
+        self.bn1 = nn.BatchNorm2d(6)
+        self.bn2 = nn.BatchNorm2d(63)
+        self.bn3 = nn.BatchNorm2d(3)
+        self.conv1 = nn.Sequential(nn.Conv2d(6, 6, kernel_size=1, bias=False),
+                                   self.bn1,
+                                   nn.LeakyReLU(negative_slope=0.2))
+        self.conv2 = nn.Sequential(nn.Conv2d(6, 3, kernel_size=2,stride=2, bias=False),
+                                   self.bn2,
+                                   nn.LeakyReLU(negative_slope=0.2))
+        self.conv3 = nn.Sequential(nn.Conv2d(3, 3, kernel_size=1, bias=False),
+                                   self.bn3,
+                                   nn.LeakyReLU(negative_slope=0.2))
+
+    def forward(self,x):
+        x=x.permute(0,2,1)
+        print(x.size())
+        x=self.conv3(self.conv2(self.conv1(x)))
+        print(x.size())
+        return x
 
 class DGCNN_partseg(nn.Module):
     def __init__(self, args, seg_num_all):
@@ -218,7 +241,6 @@ class DGCNN_partseg(nn.Module):
         self.seg_num_all = seg_num_all
         self.k = args.k
         self.transform_net = Transform_Net(args)
-        
         self.bn1 = nn.BatchNorm2d(64)
         self.bn2 = nn.BatchNorm2d(64)
         self.bn3 = nn.BatchNorm2d(64)
@@ -265,17 +287,20 @@ class DGCNN_partseg(nn.Module):
         self.conv11 = nn.Conv1d(128, self.seg_num_all, kernel_size=1, bias=False)
         
 
-    def forward(self, x, l):
+    def forward(self, x):
         batch_size = x.size(0)
-        num_points = x.size(2)
-
+        num_points = x.size(1) #changed
+        x=x.permute(0,2,1)
         x0 = get_graph_feature(x, k=self.k)     # (batch_size, 3, num_points) -> (batch_size, 3*2, num_points, k)
+        #print(x0.size())
         t = self.transform_net(x0)              # (batch_size, 3, 3)
         x = x.transpose(2, 1)                   # (batch_size, 3, num_points) -> (batch_size, num_points, 3)
+        #print(x.size(),t.size())
         x = torch.bmm(x, t)                     # (batch_size, num_points, 3) * (batch_size, 3, 3) -> (batch_size, num_points, 3)
         x = x.transpose(2, 1)                   # (batch_size, num_points, 3) -> (batch_size, 3, num_points)
-
+        #print(x.size())
         x = get_graph_feature(x, k=self.k)      # (batch_size, 3, num_points) -> (batch_size, 3*2, num_points, k)
+        #print(x.size())
         x = self.conv1(x)                       # (batch_size, 3*2, num_points, k) -> (batch_size, 64, num_points, k)
         x = self.conv2(x)                       # (batch_size, 64, num_points, k) -> (batch_size, 64, num_points, k)
         x1 = x.max(dim=-1, keepdim=False)[0]    # (batch_size, 64, num_points, k) -> (batch_size, 64, num_points)
@@ -293,16 +318,18 @@ class DGCNN_partseg(nn.Module):
 
         x = self.conv6(x)                       # (batch_size, 64*3, num_points) -> (batch_size, emb_dims, num_points)
         x = x.max(dim=-1, keepdim=True)[0]      # (batch_size, emb_dims, num_points) -> (batch_size, emb_dims, 1)
-
+        """
         l = l.view(batch_size, -1, 1)           # (batch_size, num_categoties, 1)
         l = self.conv7(l)                       # (batch_size, num_categoties, 1) -> (batch_size, 64, 1)
 
-        x = torch.cat((x, l), dim=1)            # (batch_size, 1088, 1)
-        x = x.repeat(1, 1, num_points)          # (batch_size, 1088, num_points)
-
-        x = torch.cat((x, x1, x2, x3), dim=1)   # (batch_size, 1088+64*3, num_points)
-
-        x = self.conv8(x)                       # (batch_size, 1088+64*3, num_points) -> (batch_size, 256, num_points)
+        x = torch.cat((x, l), dim=1)            # (batch_size, 1088, 1)"""
+        x = x.repeat(1, 1, num_points)          # (batch_size, 1024, num_points) #changed
+        
+        #x = torch.cat((x, x1, x2, x3), dim=1)   # (batch_size, 1088+64*3, num_points)
+        
+        x = torch.cat((x, x1, x2, x3), dim=1)   # (batch_size, 1024+64*3, num_points) # custom layer
+        
+        x = self.conv8(x)                       # (batch_size, 1024+64*3, num_points) -> (batch_size, 256, num_points) # changed input channel
         x = self.dp1(x)
         x = self.conv9(x)                       # (batch_size, 256, num_points) -> (batch_size, 256, num_points)
         x = self.dp2(x)
