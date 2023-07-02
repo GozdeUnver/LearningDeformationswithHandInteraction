@@ -17,18 +17,17 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
 from data import ShapeNetPart
-from model import DGCNN_partseg,CustomHeader
+from model_double import DGCNN_partseg,CustomHeader
 import numpy as np
 from torch.utils.data import DataLoader
 from util import cal_loss, IOStream
-import sklearn.metrics as metrics
 from plyfile import PlyData, PlyElement
 from CustomDataset import CustomDataset
 global class_cnts
 class_indexs = np.zeros((16,), dtype=int)
 global visual_warning
 visual_warning = True
-import trimesh
+# import trimesh
 
 class_choices = ['airplane', 'bag', 'cap', 'car', 'chair', 'earphone', 'guitar', 'knife', 'lamp', 'laptop', 'motorbike', 'mug', 'pistol', 'rocket', 'skateboard', 'table']
 seg_num = [4, 2, 2, 4, 4, 3, 3, 2, 4, 2, 6, 2, 3, 3, 3, 3]
