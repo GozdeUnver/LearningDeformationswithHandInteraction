@@ -1,4 +1,4 @@
-name: .at3dcv-point-correspondence
+name: .at3dcv
 channels:
   - conda-forge
   - defaults
@@ -9,6 +9,7 @@ dependencies:
   - python==3.10
   - scikit-learn
   - tqdm
+  - trimesh
   - pip:
     - potpourri3d
     - robust-laplacian

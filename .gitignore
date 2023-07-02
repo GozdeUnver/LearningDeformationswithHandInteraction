@@ -1,3 +1,6 @@
 leo_meshes.zip
 pyFM
 .vscode
+.DS_Store
+outputs
+dgcnn/__pycache__
