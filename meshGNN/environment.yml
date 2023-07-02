@@ -1,0 +1,19 @@
+# !!! Follow this to install PyMesh (change the python path on top of setup.py to the one in your environment):
+# https://pymesh.readthedocs.io/en/latest/installation.html
+
+name: .at3dcv-mesh-gnn
+channels:
+  - conda-forge
+  - defaults
+  - open3d-admin
+  - pyg
+dependencies:
+  - python=3.8
+  - addict
+  - open3d
+  - opencv
+  - pandas
+  - plyfile
+  - pybind11
+  - pyg
+  - pyyaml
