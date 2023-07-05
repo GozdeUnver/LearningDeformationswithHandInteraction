@@ -29,6 +29,7 @@ class_indexs = np.zeros((16,), dtype=int)
 global visual_warning
 visual_warning = True
 import trimesh
+from pytorch3d.loss import chamfer_distance
 
 class_choices = ['airplane', 'bag', 'cap', 'car', 'chair', 'earphone', 'guitar', 'knife', 'lamp', 'laptop', 'motorbike', 'mug', 'pistol', 'rocket', 'skateboard', 'table']
 seg_num = [4, 2, 2, 4, 4, 3, 3, 2, 4, 2, 6, 2, 3, 3, 3, 3]
@@ -140,15 +141,16 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
 
 def train(args, io):
     
-    train_dataset=CustomDataset(2048) # !!!!!!!!!
-    
+    train_dataset=CustomDataset("train") # !!!!!!!!!
+    print("args batch size",args.batch_size)
     #train_dataset = ShapeNetPart(partition='trainval', num_points=args.num_points, class_choice=3)
     if (len(train_dataset) < 100):
         drop_last = False
     else:
         drop_last = True
-    train_loader = DataLoader(train_dataset, num_workers=8, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
-    test_loader=train_loader ### !!!!!!!!!!!
+    train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
+    
+    #test_loader=CustomDataset("train",2048) ### !!!!!!!!!!!
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice), num_workers=8, batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -206,52 +208,33 @@ def train(args, io):
     #criterion = cal_loss
     
     criterion=nn.L1Loss() #!!!!!!!!!!
-    
+    criterion.to(device)
     best_test_iou = 0
+    train_loss = 0.0
     for epoch in range(args.epochs):
         ####################
         # Train
         ####################
-        train_loss = 0.0
         count = 0.0
-        model.train()
-        train_true_cls = []
-        train_pred_cls = []
-        train_true_seg = []
-        train_pred_seg = []
-        train_label_seg = []
         epoch_loss=0.
         for data,seg in train_loader:
         #for data_dict in train_loader:
             #data=data.permute(0, 2, 1)
             seg=seg.permute(0, 2, 1).float()
             data=data.float()
-            #label=data_dict["label"]
-            
-            """label_one_hot = np.zeros((label.shape[0], class_nums)) 
-            
-            for idx in range(label.shape[0]):
-                label_one_hot[idx, label[idx]] = 1"""
-            """assert label.shape == (args.batch_size, 1)
-            label_one_hot = np.zeros((args.batch_size, 16)) # Model expects 16 categories
-            label_one_hot[np.arange(args.batch_size, dtype=int), label.squeeze().to(dtype=int)] = 1
-                
-            label_one_hot = torch.from_numpy(label_one_hot.astype(np.float32)).to(device)
-            data, label_one_hot, seg = data.to(device), label_one_hot.to(device), seg.to(device)"""
             data,seg = data.to(device), seg.to(device)
             
-            seg = seg - seg_start_index
+            #seg = seg - seg_start_index
             
-            # TODO: ADD DEFORMATION TO THE SOURCE VERTEX
-            """if epoch==0:
-                pass"""
             
             batch_size = data.size()[0]
             opt.zero_grad()
-            
             seg_pred = model(data)
             #seg_pred = seg_pred.permute(0, 2, 1).contiguous()
-            loss=criterion(seg_pred,seg)
+            loss_criterion=criterion(seg_pred,seg)
+            #loss_chamfer,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
+            #loss=loss_chamfer+loss_criterion
+            loss=loss_criterion
             #loss = criterion(seg_pred.view(-1, seg_num_all), seg.view(-1,1).squeeze())
             
             loss.backward()
@@ -260,18 +243,11 @@ def train(args, io):
             #pred = seg_pred.max(dim=2)[1]               # (batch_size, num_points)
             
             
-            count += batch_size
             #train_loss += loss.item() * batch_size
             curr_loss=loss.item()
-            epoch_loss+=curr_loss
-            """seg_np = seg.cpu().numpy()                  # (batch_size, num_points)
-            pred_np = pred.detach().cpu().numpy()       # (batch_size, num_points)
-            train_true_cls.append(seg_np.reshape(-1))       # (batch_size * num_points)
-            train_pred_cls.append(pred_np.reshape(-1))      # (batch_size * num_points)
-            train_true_seg.append(seg_np)
-            train_pred_seg.append(pred_np)
-            train_label_seg.append(label.reshape(-1))"""
-            
+            epoch_loss+=curr_loss*batch_size
+       
+            count+=batch_size
         if args.scheduler == 'cos':
             scheduler.step()
         elif args.scheduler == 'step':
@@ -280,23 +256,12 @@ def train(args, io):
             if opt.param_groups[0]['lr'] < 1e-5:
                 for param_group in opt.param_groups:
                     param_group['lr'] = 1e-5
-        """train_true_cls = np.concatenate(train_true_cls)
-        train_pred_cls = np.concatenate(train_pred_cls)
-        train_acc = metrics.accuracy_score(train_true_cls, train_pred_cls)
-        avg_per_class_acc = metrics.balanced_accuracy_score(train_true_cls, train_pred_cls)
-        train_true_seg = np.concatenate(train_true_seg, axis=0)
-        train_pred_seg = np.concatenate(train_pred_seg, axis=0)
-        train_label_seg = np.concatenate(train_label_seg)
-        train_ious = calculate_shape_IoU(train_pred_seg, train_true_seg, train_label_seg, args.class_choice)
-        outstr = 'Train %d, loss: %.6f, train acc: %.6f, train avg acc: %.6f, train iou: %.6f' % (epoch, 
-                                                                                                  train_loss*1.0/count,
-                                                                                                  train_acc,
-                                                                                                  avg_per_class_acc,
-                                                                                                  np.mean(train_ious))
-        io.cprint(outstr)"""
-        print("Epoch: ",str(epoch),", current epoch train loss: ",epoch_loss)
+        
+        epoch_loss/=count
         train_loss+=epoch_loss
-        if epoch%50==0:
+        print("Epoch: ",str(epoch),", current epoch train loss: ",epoch_loss)
+        
+        if epoch%250==0:
             torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
     
     print("Total training loss: ",train_loss/args.epochs)
@@ -305,8 +270,8 @@ def train(args, io):
 def test(args,io):
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
-    test_dataset=CustomDataset(2048)
-    test_loader = DataLoader(test_dataset, num_workers=8,batch_size=args.test_batch_size, shuffle=True, drop_last=False)
+    test_dataset=CustomDataset("test")
+    test_loader = DataLoader(test_dataset, num_workers=8,batch_size=args.test_batch_size, shuffle=False, drop_last=False)
     
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -353,76 +318,43 @@ def test(args,io):
     model.eval()
 
     test_loss=0.
+    total_l1_loss=0.
+    total_chamfer_loss=0.
+    count = 0
     
-    test_acc = 0.0
-    count = 0.0
-    test_true_cls = []
-    test_pred_cls = []
-    test_true_seg = []
-    test_pred_seg = []
-    test_label_seg = []
-    test_num=0
     criterion=nn.L1Loss()
+    criterion.to(device)
+
     if not os.path.exists(args.predicted_pc):
         os.makedirs(args.predicted_pc)
-        
+    
     for data, seg in test_loader:
         seg=seg.permute(0, 2, 1).float()
         data=data.float()
-        """label_one_hot = np.zeros((label.shape[0], 16))
-        for idx in range(label.shape[0]):
-            label_one_hot[idx, label[idx]] = 1
-        label_one_hot = torch.from_numpy(label_one_hot.astype(np.float32))
-        data, label_one_hot, seg = data.to(device), label_one_hot.to(device), seg.to(device)"""
-        
-        #data = data.permute(0, 2, 1)
-        
         data,seg = data.to(device), seg.to(device)
-            
-        seg = seg - seg_start_index
+        count+=1 
+        #seg = seg - seg_start_index
         batch_size = data.size()[0]
         seg_pred = model(data)
         
         
-        loss=criterion(seg_pred,seg)
+        loss_criterion=criterion(seg_pred,seg)
+        loss_chamfer_,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
+        loss_chamfer=loss_chamfer_.detach().cpu()
+        curr_loss=loss_criterion.item()
+
+        total_l1_loss+=curr_loss
+        total_chamfer_loss+=loss_chamfer
         
-        curr_loss=loss.item()
-        print("Test loss for the batch: ",curr_loss)
+        print("Test loss for the batch: ",curr_loss,"chamfer_distance:",loss_chamfer)
         seg_pred=seg_pred.permute(0,2,1)
         for i in range(seg_pred.size()[0]):
             pred_np = seg_pred[i].detach().cpu().numpy()
-            np.save(os.path.join(args.predicted_pc,str(test_num)+"_"+str(i)+".npy"),pred_np)
+            np.save(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".npy"),pred_np)
             pred_pc = trimesh.PointCloud(pred_np)
-            pred_pc.export(os.path.join(args.predicted_pc,str(test_num)+"_"+str(i)+".ply"))
-        """seg_pred = seg_pred.permute(0, 2, 1).contiguous()
-        pred = seg_pred.max(dim=2)[1]
-        seg_np = seg.cpu().numpy()
-        pred_np = pred.detach().cpu().numpy()
-        test_true_cls.append(seg_np.reshape(-1))
-        test_pred_cls.append(pred_np.reshape(-1))
-        test_true_seg.append(seg_np)
-        test_pred_seg.append(pred_np)
-        test_label_seg.append(label.reshape(-1))"""
-        
-        
-        # visiualization
-        #visualization(args.visu, args.visu_format, data, pred, seg, label, partseg_colors, args.class_choice) 
-    """if visual_warning and args.visu != '':
-        print('Visualization Failed: You can only choose a point cloud shape to visualize within the scope of the test class')
-        
-    test_true_cls = np.concatenate(test_true_cls)
-    test_pred_cls = np.concatenate(test_pred_cls)
-    test_acc = metrics.accuracy_score(test_true_cls, test_pred_cls)
-    avg_per_class_acc = metrics.balanced_accuracy_score(test_true_cls, test_pred_cls)
-    test_true_seg = np.concatenate(test_true_seg, axis=0)
-    test_pred_seg = np.concatenate(test_pred_seg, axis=0)
-    test_label_seg = np.concatenate(test_label_seg)
-    test_ious = calculate_shape_IoU(test_pred_seg, test_true_seg, test_label_seg, args.class_choice)
-    outstr = 'Test :: test acc: %.6f, test avg acc: %.6f, test iou: %.6f' % (test_acc,
-                                                                             avg_per_class_acc,
-                                                                             np.mean(test_ious))
-    io.cprint(outstr)"""
-
+            pred_pc.export(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".ply"))
+       
+    print("Total L1 loss:",total_l1_loss/len(test_loader),"total chamfer loss:",total_chamfer_loss/len(test_loader))
 
 if __name__ == "__main__":
     # Training settings
@@ -444,7 +376,7 @@ if __name__ == "__main__":
                         help='Size of batch)')
     parser.add_argument('--epochs', type=int, default=200, metavar='N',
                         help='number of episode to train ')
-    parser.add_argument('--use_sgd', type=bool, default=True,
+    parser.add_argument('--use_sgd', type=bool, default=False,
                         help='Use SGD')
     parser.add_argument('--lr', type=float, default=0.001, metavar='LR',
                         help='learning rate (default: 0.001, 0.1 if using sgd)')
