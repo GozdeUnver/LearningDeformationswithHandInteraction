@@ -3,4 +3,4 @@ pyFM
 .vscode
 .DS_Store
 outputs
-dgcnn/__pycache__
+*__pycache__
