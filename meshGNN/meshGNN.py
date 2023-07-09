@@ -1,105 +1,111 @@
-import pymesh
-import numpy as np
+import os
+
 import torch
-from torch_geometric.data import Dataset, Data
+
+import numpy as np
+import open3d as o3d
+
 from torch_geometric.loader import DataLoader
-from torch_geometric.nn import GCNConv
 
-# loading a single mesh_pair
-loaded_mesh_pairs = []
-undeformed_mesh = pymesh.meshio.load_mesh('data/undeformed_mesh_1.obj')
-deformed_mesh = pymesh.meshio.load_mesh('data/deformed_mesh_1.obj')
-correspondences = np.load('data/correspondences_1')
-contact_point = np.load('data/contact_point_1')
-max_displacement = np.load('data/max_disp_1')
-loaded_mesh_pairs.append(zip(undeformed_mesh, deformed_mesh, correspondences, contact_point, max_displacement))
-#need to: load all pairs of meshes with correspondences + contact point
+from CustomDataset import CustomDataset
+from model import MeshGNN
 
-#retrieve vertices/faces and edges -- create dataset
-#remaining question -- embedding feature 'max displacement' in graph -- global feature?
-
-class MeshPairDataset(Dataset):
-    def __init__(self, mesh_pairs, transform=None, pre_transform=None):
-        super(MeshPairDataset, self).__init__('.', transform, pre_transform)
-        self.mesh_pairs = mesh_pairs
-
-    def len(self):
-        return len(self.mesh_pairs)
-
-    def get(self, idx):
-        undeformed_mesh, deformed_mesh, correspondences, contact_point, max_displacement = self.mesh_pairs[idx]
-        x = torch.tensor(undeformed_mesh.vertices, dtype=torch.float)
-        edges = []
-        for face in undeformed_mesh.faces: #assumes triangle mesh
-            edges.append([face[0], face[1]])
-            edges.append([face[1], face[0]])
-            edges.append([face[1], face[2]])
-            edges.append([face[2], face[1]])
-            edges.append([face[2], face[0]])
-            edges.append([face[0], face[2]])
-        edge_index = torch.tensor(edges, dtype=torch.long).t().contiguous()
-
-        #can append displacement as feature for only that node or for all nodes...
-        #depending on message passing procedure may not affect all nodes if only applied to single node
-        #but inputting multiple contact points becomes unviable if applied to all
-        #here adding max_disp feature to all nodes while one-hot encoding the contact point
-        #could maybe try to encode proximity or something instead of one-hot
-        max_displacement_tensor = torch.full((undeformed_mesh.num_nodes, 1), max_displacement)
-        contact_point_tensor = torch.zeros(undeformed_mesh.num_nodes, 1)
-        contact_point_tensor[contact_point] = 1
-        x = torch.cat([x, max_displacement_tensor, contact_point_tensor], dim=-1)
-
-        y = torch.tensor(deformed_mesh.vertices, dtype=torch.float)
-        correspondences_tensor = torch.tensor(correspondences, dtype=torch.float)
-
-        data = Data(x=x, edge_index=edge_index, y=y, correspondences=correspondences_tensor)
-        data.num_nodes = len(undeformed_mesh.vertices)
-        return data
+Vec3d = o3d.utility.Vector3dVector
+Vec3i = o3d.utility.Vector3iVector
 
 
-dataset = MeshPairDataset(loaded_mesh_pairs)
-dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+CONFIG_NAME = 'sageconv_multilayer'
 
-class MeshGCN(torch.nn.Module):
-    def __init__(self, num_node_features):
-        super(MeshGCN, self).__init__()
-        self.conv1 = GCNConv(num_node_features, 16)
-        self.conv2 = GCNConv(16, num_node_features)  #can alternatively define own message passing procedure
+outputs_folder_path = os.path.join('outputs', CONFIG_NAME)
+models_folder_path = os.path.join(outputs_folder_path, 'models')
+model_file_path = os.path.join(models_folder_path, 'model.t7')
+meshes_folder_path = os.path.join(outputs_folder_path, 'predicted_meshes')
 
-    def forward(self, data):
-        x, edge_index = data.x, data.edge_index
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
-        # First Message Passing Layer (ReLU activation)
-        x = self.conv1(x, edge_index)
-        x = torch.nn.functional.relu(x)
-
-        # Second Message Passing Layer
-        x = self.conv2(x, edge_index)
-
-        return x
+loss_fn = torch.nn.L1Loss()
 
 
-model = MeshGCN()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
-
-for epoch in range(100):
-    for data in dataloader:
-        model.train()
-        optimizer.zero_grad()
-        target = data.y
-        correspondences = data.correspondences
-        out = model(data)
-        #use correspondences to calculate loss
-        #means network will learn how to move vertices according to correspondence algorithm...
-        pred_corr = out.x[correspondences[:, 0]]
-        actual_corr = target[correspondences[:, 1]]
-        loss = torch.nn.functional.mse_loss(pred_corr, actual_corr)
-        loss.backward()
-        optimizer.step()
-        print(f'Epoch: {epoch}, Loss: {loss.item()}')
+def create_train_data_loader():
+    dataset = CustomDataset(preload=True, flavor='train')
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    return dataloader
 
 
-unseen_contact_point_w_disp = ...
-new_data = ...
+def create_test_data_loader():
+    dataset = CustomDataset(preload=True, flavor='test')
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    return dataloader
 
-out = model(new_data)
+
+def prepare_graph(graph):
+    nodes, edges = graph
+    return (
+        nodes.to(device).squeeze(0),
+        edges.to(device).squeeze(0)
+    )
+
+def train(epochs = 1000, print_every = 10):
+    model = MeshGNN().to(device)
+
+    # parameters = list(gcn_conv.parameters()) + list(edge_conv.parameters())
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
+
+    best_loss = torch.inf
+    best_model = model.state_dict()
+
+    dataloader = create_train_data_loader()
+
+    for epoch in range(epochs):
+        for input_graph, target_points in dataloader:
+            input_nodes, input_edges = prepare_graph(input_graph)
+            pred_points = model(input_nodes, input_edges)
+            target_points = target_points.to(device).squeeze(0)
+
+            optimizer.zero_grad()
+            loss = loss_fn(pred_points, target_points)
+            loss.backward()
+            optimizer.step()
+            
+            if epoch % print_every == 0:
+                print(f'Epoch {epoch}: Loss={loss.item()}')
+            if loss.item() < best_loss:
+                best_loss = loss.item()
+                best_model = model.state_dict()
+                print('New Best! Loss=' + str(loss.item()))
+
+    if not os.path.exists(models_folder_path):
+        os.makedirs(models_folder_path)
+    torch.save(best_model, model_file_path)
+
+
+def test(save_targets=False):
+    model = MeshGNN().to(device)
+    state_dict = torch.load(model_file_path, map_location=device)
+    model.load_state_dict(state_dict)
+    dataloader = create_test_data_loader()
+    if not os.path.exists(meshes_folder_path):
+        os.makedirs(meshes_folder_path)
+
+    for i, (input_triangles, input_graph, target_points) in enumerate(dataloader):
+        input_nodes, input_edges = prepare_graph(input_graph)
+        pred_points = model(input_nodes, input_edges)
+
+        target_points = target_points.to(device).squeeze(0)
+        loss = loss_fn(pred_points, target_points).item()
+        print(f'Sample {i}: Loss={loss}')
+
+        pred_mesh = o3d.geometry.TriangleMesh(
+            Vec3d(pred_points.cpu().detach().numpy()),
+            Vec3i(input_triangles.squeeze().detach().numpy())
+        )
+        mesh_file_path = os.path.join(meshes_folder_path, f'pred_{i}.obj')
+        o3d.io.write_triangle_mesh(mesh_file_path, pred_mesh)
+        if save_targets:
+            pred_mesh.vertices = Vec3d(target_points.cpu().detach().numpy())
+            mesh_file_path = os.path.join(meshes_folder_path, f'target_{i}.obj')
+            o3d.io.write_triangle_mesh(mesh_file_path, pred_mesh)
+
+if __name__ == '__main__':
+    # train(epochs=3000)
+    test(save_targets=True)
