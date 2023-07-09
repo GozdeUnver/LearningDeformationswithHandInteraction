@@ -31,7 +31,7 @@ def get_graph_from_mesh(mesh):
 
 
 class CustomDataset(torch.utils.data.Dataset):
-    def __init__(self, num_points=2048, preload=False):
+    def __init__(self, num_points=2048, preload=False, flavor='all'):
         super().__init__()
 
         self.deformation_nondeformed_paths=["../data/pointcloud_sampled/YellowToy01/deformations/non_deformed_2_correspondences_zoom_2048_paired_648.ply"]
@@ -40,6 +40,9 @@ class CustomDataset(torch.utils.data.Dataset):
         self.target_pc_paths = ['../data/pointcloud_sampled/YellowToy01/targets/deformed_2_correspondences_zoom_2048.ply']
         self.input_mesh_paths = ['../data/pointcloud_sampled/YellowToy01/inputs/yellow_push_toy_1_70000.obj']
         self.input_pc_paths = ['../data/pointcloud_sampled/YellowToy01/inputs/non_deformed_2_correspondences_zoom_2048.ply']
+
+        assert flavor in ['train', 'test']
+        self.flavor = flavor
 
         if preload:
             self.data = [self._load_graphs(index) for index in range(len(self.input_mesh_paths))]
@@ -79,11 +82,15 @@ class CustomDataset(torch.utils.data.Dataset):
 
         input_graph_vertices, input_graph_edges = get_graph_from_mesh(input_mesh)
         assert np.all(input_graph_vertices == input_mesh_points)
-        input_graph = torch.from_numpy(input_graph_embeddings), torch.from_numpy(input_graph_edges)
-
-        target_graph_vertices, target_graph_edges = get_graph_from_mesh(target_mesh)
-        assert np.all(target_graph_vertices == np.asarray(target_mesh.vertices))
-        target_graph = torch.from_numpy(target_graph_vertices), torch.from_numpy(target_graph_edges)
-
-        return input_graph, target_graph
+        input_graph = (
+            torch.from_numpy(input_graph_embeddings).to(dtype=torch.float32),
+            torch.from_numpy(input_graph_edges).T.to(dtype=torch.int64)
+        )
+        
+        target_points = torch.from_numpy(np.asarray(target_mesh.vertices))
+        if self.flavor == 'test':
+            input_triangles = torch.from_numpy(np.asarray(input_mesh.triangles))
+            return input_triangles, input_graph, target_points
+        else:
+            return input_graph, target_points
     
