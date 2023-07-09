@@ -31,20 +31,37 @@ def get_graph_from_mesh(mesh):
 
 
 class CustomDataset(torch.utils.data.Dataset):
-    def __init__(self, num_points=2048):
+    def __init__(self, num_points=2048, preload=False):
         super().__init__()
+
         self.deformation_nondeformed_paths=["../data/pointcloud_sampled/YellowToy01/deformations/non_deformed_2_correspondences_zoom_2048_paired_648.ply"]
         self.deformation_deformed_paths=["../data/pointcloud_sampled/YellowToy01/deformations/deformed_2_correspondences_zoom_2048_paired_648.ply"]
         self.target_mesh_paths = ['../data/pointcloud_sampled/YellowToy01/targets/yellow_push_toy_2_70000.obj']
         self.target_pc_paths = ['../data/pointcloud_sampled/YellowToy01/targets/deformed_2_correspondences_zoom_2048.ply']
         self.input_mesh_paths = ['../data/pointcloud_sampled/YellowToy01/inputs/yellow_push_toy_1_70000.obj']
         self.input_pc_paths = ['../data/pointcloud_sampled/YellowToy01/inputs/non_deformed_2_correspondences_zoom_2048.ply']
+
+        if preload:
+            self.data = [self._load_graphs(index) for index in range(len(self.input_mesh_paths))]
+        else:
+            self.data = None
+
         self.num_points=num_points
         self.seg_num_all = 3
         self.seg_start_index = 0
             
     def __getitem__(self, index):
         index = 0 # THIS IS BECAUSE OF BATCHNORMS - CHANGE WHEN NOT OVERFITTING!
+        if self.data is None:
+            return self._load_graphs(index)
+        else:
+            return self.data[index]
+
+    def __len__(self):
+        return 2 * len(self.input_mesh_paths) # THIS IS BECAUSE OF BATCHNORMS - CHANGE WHEN NOT OVERFITTING!
+        return len(self.input_mesh_paths)
+    
+    def _load_graphs(self, index):
         deformed_mesh=np.asarray(o3d.io.read_point_cloud(self.deformation_deformed_paths[index]).points, dtype=np.float32)
         non_deformed_mesh=np.asarray(o3d.io.read_point_cloud(self.deformation_nondeformed_paths[index]).points, dtype=np.float32)
 
@@ -70,6 +87,3 @@ class CustomDataset(torch.utils.data.Dataset):
 
         return input_graph, target_graph
     
-    def __len__(self):
-        return 2 * len(self.target_mesh_paths) # THIS IS BECAUSE OF BATCHNORMS - CHANGE WHEN NOT OVERFITTING!
-        return len(self.target_mesh_paths)
