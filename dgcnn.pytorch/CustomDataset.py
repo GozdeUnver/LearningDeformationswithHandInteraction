@@ -6,25 +6,21 @@ import torch
 import os
 import cv2
 import open3d
+import pandas as pd
+import pyvista as pv
+
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self,split,path=None,deformation_path=None,num_points=2048):
         super().__init__()
+        df_temp=pd.read_csv("./data/cube_dataset.csv")
         if split=="train":
-            f_t=open("./data/train_targets.txt")
-            self.target_paths=[line.rstrip() for line in f_t]
-            f_i=open("./data/train_inputs.txt")
-            self.input_paths=[line.rstrip() for line in f_i]
-        
+            df=df_temp.loc[df_temp['train_sample'] == True]
         else:
-            self.target_paths=["./data/Sphere/normal/targets/5.obj","./data/Sphere/10_offcenter/targets/5.obj",
-            "./data/Sphere/20_offcenter/targets/5.obj",
-            "./data/YellowToy01/targets/deformed_2_correspondences_zoomout_2048_total_shape_2048.ply",
-            "./data/YellowToy01/targets/deformed_4_correspondences_zoom_2048.ply"]
-            self.input_paths=["./data/Sphere/normal/inputs/1.obj",
-            "./data/Sphere/10_offcenter/inputs/1.obj",
-            "./data/Sphere/20_offcenter/inputs/1.obj",
-            "./data/YellowToy01/inputs/non_deformed_2_correspondences_zoom_2048.ply",
-            "./data/YellowToy01/inputs/non_deformed_4_correspondences_zoom_2048.ply"]
+            df=df_temp.loc[df_temp['train_sample'] == False]
+
+        self.input_paths=df["input"]
+        self.target_paths=df["target"]
+        self.contact_points=df["contact_vertex"].astype(int)
 
         #self.num_points=num_points
         self.seg_num_all = 3
@@ -40,18 +36,13 @@ class CustomDataset(torch.utils.data.Dataset):
             input_mesh=np.asarray(o3d.io.read_triangle_mesh(self.input_paths[index]).vertices,dtype=np.float32)
             target_mesh=np.asarray(o3d.io.read_triangle_mesh(self.target_paths[index]).vertices,dtype=np.float32)
         else:
-            input_mesh=np.asarray(open3d.io.read_point_cloud(self.input_paths[index]).points, dtype=np.float32)
-            target_mesh=np.asarray(open3d.io.read_point_cloud(self.target_paths[index]).points, dtype=np.float32)
+            input_mesh=np.asarray(pv.read(self.input_paths[index]).points,dtype=np.float16)
+            target_mesh=np.asarray(pv.read(self.target_paths[index]).points, dtype=np.float16)
+            contact_point=self.contact_points[index]
        
-        deformed_mesh=target_mesh
-        non_deformed_mesh=target_mesh
-        deformation_vectors = non_deformed_mesh-deformed_mesh
-        distances = np.linalg.norm(deformation_vectors, axis=1)
-        max_index=np.argmax(distances)
-        deformation_vector=deformation_vectors[max_index]
-        mesh_index=np.where(input_mesh == non_deformed_mesh[max_index])
+        
         deformations=np.zeros(input_mesh.shape)
-        deformations[mesh_index,:] =deformation_vector
+        deformations[contact_point,:] =input_mesh[contact_point]-target_mesh[contact_point]
         input_mesh = np.concatenate([input_mesh, deformations], axis=1)
 
         return input_mesh, target_mesh
