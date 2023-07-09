@@ -3,6 +3,7 @@ from pathlib import Path
 import numpy as np
 import torch
 import open3d as o3d
+import os
 
 from pymesh import mesh_to_graph, form_mesh as form_pm_mesh
 
@@ -34,9 +35,9 @@ class CustomDataset(torch.utils.data.Dataset):
         super().__init__()
         self.deformation_nondeformed_paths=["../data/pointcloud_sampled/YellowToy01/deformations/non_deformed_2_correspondences_zoom_2048_paired_648.ply"]
         self.deformation_deformed_paths=["../data/pointcloud_sampled/YellowToy01/deformations/deformed_2_correspondences_zoom_2048_paired_648.ply"]
-        self.target_mesh_paths = ['../data/poincloud_sampled/YellowToy01/targets/yellow_push_toy_1_70000.obj']
+        self.target_mesh_paths = ['../data/pointcloud_sampled/YellowToy01/targets/yellow_push_toy_2_70000.obj']
         self.target_pc_paths = ['../data/pointcloud_sampled/YellowToy01/targets/deformed_2_correspondences_zoom_2048.ply']
-        self.input_mesh_paths = ['../data/poincloud_sampled/YellowToy01/inputs/yellow_push_toy_1_70000.obj']
+        self.input_mesh_paths = ['../data/pointcloud_sampled/YellowToy01/inputs/yellow_push_toy_1_70000.obj']
         self.input_pc_paths = ['../data/pointcloud_sampled/YellowToy01/inputs/non_deformed_2_correspondences_zoom_2048.ply']
         self.num_points=num_points
         self.seg_num_all = 3
@@ -61,11 +62,11 @@ class CustomDataset(torch.utils.data.Dataset):
 
         input_graph_vertices, input_graph_edges = get_graph_from_mesh(input_mesh)
         assert np.all(input_graph_vertices == input_mesh_points)
-        input_graph = input_graph_embeddings, input_graph_edges
+        input_graph = torch.from_numpy(input_graph_embeddings), torch.from_numpy(input_graph_edges)
 
         target_graph_vertices, target_graph_edges = get_graph_from_mesh(target_mesh)
         assert np.all(target_graph_vertices == np.asarray(target_mesh.vertices))
-        target_graph = target_graph_vertices, target_graph_edges
+        target_graph = torch.from_numpy(target_graph_vertices), torch.from_numpy(target_graph_edges)
 
         return input_graph, target_graph
     
