@@ -87,7 +87,7 @@ class CustomDataset(torch.utils.data.Dataset):
             torch.from_numpy(input_graph_edges).T.to(dtype=torch.int64)
         )
         
-        target_points = torch.from_numpy(np.asarray(target_mesh.vertices))
+        target_points = torch.from_numpy(np.asarray(target_mesh.vertices)).to(dtype=torch.float32)
         if self.flavor == 'test':
             input_triangles = torch.from_numpy(np.asarray(input_mesh.triangles))
             return input_triangles, input_graph, target_points
