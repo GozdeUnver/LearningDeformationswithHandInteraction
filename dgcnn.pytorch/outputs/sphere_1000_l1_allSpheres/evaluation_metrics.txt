@@ -1,0 +1,7 @@
+Total training loss:  3.800672184033829
+Test loss for the batch:  1.693230152130127 chamfer_distance: tensor(20.0575)
+Test loss for the batch:  1.5859493017196655 chamfer_distance: tensor(15.9545)
+Test loss for the batch:  0.764481782913208 chamfer_distance: tensor(6.0965)
+Test loss for the batch:  26.921606063842773 chamfer_distance: tensor(11299.8672)
+Test loss for the batch:  26.92213249206543 chamfer_distance: tensor(11300.1387)
+Total L1 loss: 11.57747995853424 total chamfer loss: tensor(4528.4229)
