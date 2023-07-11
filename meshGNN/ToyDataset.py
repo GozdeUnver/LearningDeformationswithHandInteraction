@@ -30,8 +30,8 @@ def get_graph_from_mesh(mesh):
     return mesh_to_graph(pm_mesh)
 
 
-class CustomDataset(torch.utils.data.Dataset):
-    def __init__(self, num_points=2048, preload=False, flavor='all'):
+class ToyDataset(torch.utils.data.Dataset):
+    def __init__(self, num_points=2048, preload=False, flavor='train'):
         super().__init__()
 
         self.deformation_nondeformed_paths=["../data/pointcloud_sampled/YellowToy01/deformations/non_deformed_2_correspondences_zoom_2048_paired_648.ply"]

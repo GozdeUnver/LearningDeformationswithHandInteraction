@@ -4,19 +4,21 @@ from torch_geometric.nn import MessagePassing, SAGEConv
 from torch_geometric.utils import add_self_loops, degree
 
 
+# Try BFS to find subgraph around the contact point
 class MeshGNN(torch.nn.Module):
     def __init__(self, *args, **kwargs) -> None:
         super().__init__(*args, **kwargs)
-        self.relu = ReLU()
+        # self.relu = ReLU()
         self.layers = Seq(
-            SAGEConv(6, 5),
-            SAGEConv(5, 3)
+            SAGEConv(6, 3),
+            # Try different layers. Use activation
         )
     
     def forward(self, x, edge_index):
-        for layer in self.layers[:-1]:
-            x = layer(x, edge_index)
-        x = self.layers[-1](x, edge_index)
+        for _ in range(15):
+            for layer in self.layers[:-1]:
+                x = layer(x, edge_index)
+            x = self.layers[-1](x, edge_index)
         
         return x
 
