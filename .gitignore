@@ -5,4 +5,5 @@ pyFM
 meshGNN/outputs
 cube.zip
 *__pycache__*
-dgcnn.pytorch/data/cube
+dgcnn.pytorch/data
+dgcnn.pytorch/outputs
