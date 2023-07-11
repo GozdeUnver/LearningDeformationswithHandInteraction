@@ -1,5 +1,8 @@
 leo_meshes.zip
 pyFM
+.vscode
 .DS_Store
-outputs
-dgcnn/__pycache__
+meshGNN/outputs
+cube.zip
+*__pycache__*
+dgcnn.pytorch/data/cube
