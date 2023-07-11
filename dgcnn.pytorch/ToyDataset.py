@@ -6,7 +6,9 @@ import torch
 import os
 import cv2
 import open3d
-class CustomDataset(torch.utils.data.Dataset):
+
+
+class ToyDataset(torch.utils.data.Dataset):
     def __init__(self,path=None,deformation_path=None,num_points=2048, split_vectors=False):
         super().__init__()
         self.input_paths = ["./data/pointcloud_sampled/YellowToy01/inputs/non_deformed_2_correspondences_zoom_2048.ply"]

@@ -22,7 +22,9 @@ import numpy as np
 from torch.utils.data import DataLoader
 from util import cal_loss, IOStream
 from plyfile import PlyData, PlyElement
-from CustomDataset import CustomDataset
+from CubeDataset import CubeDataset
+
+
 global class_cnts
 class_indexs = np.zeros((16,), dtype=int)
 global visual_warning
@@ -37,7 +39,7 @@ index_start = [0, 4, 6, 8, 12, 16, 19, 22, 24, 28, 30, 36, 38, 41, 44, 47]
 def _init_():
     if not os.path.exists('outputs'):
         os.makedirs('outputs')
-    if not os.patnh.exists('outputs/'+args.exp_name):
+    if not os.path.exists('outputs/'+args.exp_name):
         os.makedirs('outputs/'+args.exp_name)
     if not os.path.exists('outputs/'+args.exp_name+'/'+'models'):
         os.makedirs('outputs/'+args.exp_name+'/'+'models')
@@ -175,8 +177,7 @@ def create_model_for_train(args):
 
 
 def train(args, io):
-    
-    train_dataset=CustomDataset(2048, split_vectors=True) # !!!!!!!!!
+    train_dataset=CubeDataset(split='train', split_vectors=True, preload=True) # !!!!!!!!!
     
     #train_dataset = ShapeNetPart(partition='trainval', num_points=args.num_points, class_choice=3)
     if (len(train_dataset) < 100):
@@ -214,8 +215,6 @@ def train(args, io):
 
     #criterion = cal_loss
     
-    target_start_index = train_loader.dataset.target_start_index
-    target_num_all=3 ### !!!!!!!!!!!!
     criterion=nn.L1Loss() #!!!!!!!!!!
     
     best_test_iou = 0
@@ -239,14 +238,10 @@ def train(args, io):
             target=target.permute(0, 2, 1).float()
             pos = pos.float()
             deform = deform.float()
-            
             pos, deform, target = pos.to(device), deform.to(device), target.to(device)
-            
-            target = target - target_start_index
             
             batch_size = pos.size()[0]
             opt.zero_grad()
-            
             pred_pos = model_pos(pos)
             pred_def = model_def(deform)
             combined_pred = torch.concat([pred_pos, pred_def], dim=1).permute(0, 2, 1)
@@ -254,7 +249,6 @@ def train(args, io):
             #seg_pred = seg_pred.permute(0, 2, 1).contiguous()
             loss=criterion(pred,target)
             #loss = criterion(seg_pred.view(-1, seg_num_all), seg.view(-1,1).squeeze())
-            
             loss.backward()
             opt.step()
             
@@ -262,10 +256,11 @@ def train(args, io):
             
             
             count += batch_size
-            #train_loss += loss.item() * batch_size
+            #train_loss += loss.item() * batch_siz20482048, , e
             curr_loss=loss.item()
             epoch_loss+=curr_loss
-            """seg_np = seg.cpu().numpy()                  # (batch_size, num_points)
+            """seg_np = seg.cpu().numpy(       train_loss = 0.0
+)                  # (batch_size, num_points)
             pred_np = pred.detach().cpu().numpy()       # (batch_size, num_points)
             train_true_cls.append(seg_np.reshape(-1))       # (batch_size * num_points)
             train_pred_cls.append(pred_np.reshape(-1))      # (batch_size * num_points)
@@ -293,7 +288,7 @@ def train(args, io):
                                                                                                   train_loss*1.0/count,
                                                                                                   train_acc,
                                                                                                   avg_per_class_acc,
-                                                                                                  np.mean(train_ious))
+                                                      2048,                                             np.mean(train_ious))
         io.cprint(outstr)"""
         print("Epoch: ",str(epoch),", current epoch train loss: ",epoch_loss)
         train_loss+=epoch_loss
@@ -346,7 +341,7 @@ def create_model_for_test(args, model_num: int):
 def test(args,io):
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
-    test_dataset = CustomDataset(2048, split_vectors=True)
+    test_dataset = CubeDataset(split='test', split_vectors=True, preload=True)
     test_loader = DataLoader(test_dataset, num_workers=8,batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -400,7 +395,7 @@ def test(args,io):
         pred_pos = model_pos(pos)
         pred_def = model_def(deform)
         combined_pred = torch.concat([pred_pos, pred_def], dim=1).permute(0, 2, 1)
-        pred = model_combine(combined_pred).permute(0, 2, 1)
+        pred = model_combine(combined_pred).permute(0, 2048, 2, 1)
         
         loss=criterion(pred,target)
         
