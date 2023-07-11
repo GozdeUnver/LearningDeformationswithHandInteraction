@@ -194,6 +194,7 @@ class Transform_Net(nn.Module):
 
     def forward(self, x):
         batch_size = x.size(0)
+
         x = self.conv1(x)                       # (batch_size, 3*2, num_points, k) -> (batch_size, 64, num_points, k)
         x = self.conv2(x)                       # (batch_size, 64, num_points, k) -> (batch_size, 128, num_points, k)
         x = x.max(dim=-1, keepdim=False)[0]     # (batch_size, 128, num_points, k) -> (batch_size, 128, num_points)
@@ -205,15 +206,15 @@ class Transform_Net(nn.Module):
         x = F.leaky_relu(self.bn4(self.linear2(x)), negative_slope=0.2)     # (batch_size, 512) -> (batch_size, 256)
 
         x = self.transform(x)                   # (batch_size, 256) -> (batch_size, 3*3)
-        #x = x.view(batch_size, 3, 3)            # (batch_size, 3*3) -> (batch_size, 3, 3)
-        x=x.view(batch_size,6,6) #new
+        x = x.view(batch_size, 3, 3)            # (batch_size, 3*3) -> (batch_size, 3, 3)
+
         return x
 
 class CustomHeader(nn.Module):
     def __init__(self, args):
         super(CustomHeader, self).__init__()
         self.args = args
-        self.bn1 = nn.BatchNorm2d(6)
+        """self.bn1 = nn.BatchNorm2d(6)
         self.bn2 = nn.BatchNorm2d(63)
         self.bn3 = nn.BatchNorm2d(3)
         self.conv1 = nn.Sequential(nn.Conv2d(6, 6, kernel_size=1, bias=False),
@@ -224,14 +225,24 @@ class CustomHeader(nn.Module):
                                    nn.LeakyReLU(negative_slope=0.2))
         self.conv3 = nn.Sequential(nn.Conv2d(3, 3, kernel_size=1, bias=False),
                                    self.bn3,
-                                   nn.LeakyReLU(negative_slope=0.2))
+                                   nn.LeakyReLU(negative_slope=0.2))"""
+        self.lin1=nn.Linear(6,6)
+        self.lin2=nn.Linear(6,3)
+        self.lin3=nn.Linear(3,3)
+        self.relu=nn.ReLU()
 
     def forward(self,x):
-        x=x.permute(0,2,1)
+        """x=x.permute(0,2,1)
         print(x.size())
         x=self.conv3(self.conv2(self.conv1(x)))
         print(x.size())
-        return x
+        return x"""
+        x=self.lin1(x)
+        x=self.relu(x)
+        x=self.lin2(x)
+        x=self.relu(x)
+        x=self.lin3(x)
+        return self.relu(x)
 
 class DGCNN_partseg(nn.Module):
     def __init__(self, args, seg_num_all):
@@ -291,15 +302,14 @@ class DGCNN_partseg(nn.Module):
         num_points = x.size(1) #changed
         x=x.permute(0,2,1)
         x0 = get_graph_feature(x, k=self.k)     # (batch_size, 3, num_points) -> (batch_size, 3*2, num_points, k)
-        #print(x0.size())
+        
         t = self.transform_net(x0)              # (batch_size, 3, 3)
         x = x.transpose(2, 1)                   # (batch_size, 3, num_points) -> (batch_size, num_points, 3)
-        #print(x.size(),t.size())
         x = torch.bmm(x, t)                     # (batch_size, num_points, 3) * (batch_size, 3, 3) -> (batch_size, num_points, 3)
         x = x.transpose(2, 1)                   # (batch_size, num_points, 3) -> (batch_size, 3, num_points)
-        #print(x.size())
+        
         x = get_graph_feature(x, k=self.k)      # (batch_size, 3, num_points) -> (batch_size, 3*2, num_points, k)
-        #print(x.size())
+        
         x = self.conv1(x)                       # (batch_size, 3*2, num_points, k) -> (batch_size, 64, num_points, k)
         x = self.conv2(x)                       # (batch_size, 64, num_points, k) -> (batch_size, 64, num_points, k)
         x1 = x.max(dim=-1, keepdim=False)[0]    # (batch_size, 64, num_points, k) -> (batch_size, 64, num_points)
