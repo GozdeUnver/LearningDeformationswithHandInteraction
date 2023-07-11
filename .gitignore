@@ -2,4 +2,6 @@ leo_meshes.zip
 pyFM
 .DS_Store
 outputs
-dgcnn/__pycache__
+*__pycache__*
+.vscode
+dgcnn.pytorch/data
