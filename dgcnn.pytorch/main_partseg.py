@@ -30,6 +30,7 @@ global visual_warning
 visual_warning = True
 import trimesh
 from pytorch3d.loss import chamfer_distance
+from torch.utils.tensorboard import SummaryWriter
 
 class_choices = ['airplane', 'bag', 'cap', 'car', 'chair', 'earphone', 'guitar', 'knife', 'lamp', 'laptop', 'motorbike', 'mug', 'pistol', 'rocket', 'skateboard', 'table']
 seg_num = [4, 2, 2, 4, 4, 3, 3, 2, 4, 2, 6, 2, 3, 3, 3, 3]
@@ -139,8 +140,9 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
 
 
-def train(args, io):
-    
+def train(args, io,tolerance=100):
+    log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
+
     train_dataset=CustomDataset("train") # !!!!!!!!!
     val_dataset=CustomDataset("val")
     print("args batch size",args.batch_size)
@@ -149,7 +151,7 @@ def train(args, io):
         drop_last = False
     else:
         drop_last = True
-    print()
+    writer = SummaryWriter(log_dir = log_dir)
     train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
     val_loader= DataLoader(val_dataset, num_workers=2, batch_size=args.batch_size, shuffle=False, drop_last=drop_last)
     
@@ -212,7 +214,7 @@ def train(args, io):
     
     criterion=nn.L1Loss() #!!!!!!!!!!
     criterion.to(device)
-    best_test_iou = 0
+    waiting=0
     train_loss = 0.0
     for epoch in range(args.epochs):
         ####################
@@ -248,9 +250,10 @@ def train(args, io):
             
             #train_loss += loss.item() * batch_size
             curr_loss=loss.item()
-            epoch_loss+=curr_loss*batch_size
+            epoch_loss+=curr_loss
        
             count+=batch_size
+        
         if args.scheduler == 'cos':
             scheduler.step()
         elif args.scheduler == 'step':
@@ -260,14 +263,45 @@ def train(args, io):
                 for param_group in opt.param_groups:
                     param_group['lr'] = 1e-5
         
-        epoch_loss/=count
-        train_loss+=epoch_loss
-        print("Epoch: ",str(epoch),", current epoch train loss: ",epoch_loss)
+        train_loss = epoch_loss / len(train_loader)
+        train_loss_final+=train_loss
+        writer.add_scalar('Loss/train', train_loss, epoch)
+        print("Epoch: ",str(epoch),", current epoch train loss: ",train_loss)
+        waiting += 1
         
-        if epoch%5==0:
+        if epoch>0 and epoch%50==0:
+            
+            model.eval()
+            print("Validation starts...")
+            with torch.no_grad():
+                loss_val=0.
+                for data_val, seg_val in val_loader:
+                    seg_val=seg_val.permute(0, 2, 1).float()
+                    data_val=data_val.float()
+                    data_val,seg_val = data_val.to(device), seg_val.to(device)
+                    
+                    batch_size = data_val.size()[0]
+                    seg_pred_val = model(data_val)
+                    opt.zero_grad()
+                    loss_criterion_val=criterion(seg_pred_val,seg_val)
+                    loss=loss_criterion_val
+                    loss_val+=loss.item()
+                    loss.backward()
+                    opt.step()
+                print("Validation loss:",loss_val/ len(val_loader))
+                writer.add_scalar('Loss/val', loss_val/ len(val_loader), epoch)
+            model.train()
+            if epoch_loss < best_loss:
+                best_loss = epoch_loss
+                best_model = model.state_dict()
+                torch.save(best_model, 'outputs/%s/models/best_model.t7' % args.exp_name)
+                waiting = 0
+            if waiting >= tolerance > 0:
+                break
+    if epoch%250==0:
             torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
     
-    print("Total training loss: ",train_loss/args.epochs)
+    print("Total training loss: ",train_loss_final/args.epochs)
     torch.save(model.state_dict(), 'outputs/%s/models/model_final.t7' % args.exp_name)
 
 def test(args,io):
@@ -330,33 +364,34 @@ def test(args,io):
 
     if not os.path.exists(args.predicted_pc):
         os.makedirs(args.predicted_pc)
-    
-    for data, seg in test_loader:
-        seg=seg.permute(0, 2, 1).float()
-        data=data.float()
-        data,seg = data.to(device), seg.to(device)
-        count+=1 
-        #seg = seg - seg_start_index
-        batch_size = data.size()[0]
-        seg_pred = model(data)
-        
-        
-        loss_criterion=criterion(seg_pred,seg)
-        loss_chamfer_,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
-        loss_chamfer=loss_chamfer_.detach().cpu()
-        curr_loss=loss_criterion.item()
+    with torch.no_grad():
+        for data, seg in test_loader:
+            
+            seg=seg.permute(0, 2, 1).float()
+            data=data.float()
+            data,seg = data.to(device), seg.to(device)
+            count+=1 
+            #seg = seg - seg_start_index
+            batch_size = data.size()[0]
+            seg_pred = model(data)
+            
+            
+            loss_criterion=criterion(seg_pred,seg)
+            loss_chamfer_,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
+            loss_chamfer=loss_chamfer_.detach().cpu()
+            curr_loss=loss_criterion.item()
 
-        total_l1_loss+=curr_loss
-        total_chamfer_loss+=loss_chamfer
-        
-        print("Test loss for the batch: ",curr_loss,"chamfer_distance:",loss_chamfer)
-        seg_pred=seg_pred.permute(0,2,1)
-        for i in range(seg_pred.size()[0]):
-            pred_np = seg_pred[i].detach().cpu().numpy()
-            np.save(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".npy"),pred_np)
-            pred_pc = trimesh.PointCloud(pred_np)
-            pred_pc.export(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".ply"))
-       
+            total_l1_loss+=curr_loss
+            total_chamfer_loss+=loss_chamfer
+            
+            print("Test loss for the batch: ",curr_loss,"chamfer_distance:",loss_chamfer)
+            seg_pred=seg_pred.permute(0,2,1)
+            for i in range(seg_pred.size()[0]):
+                pred_np = seg_pred[i].detach().cpu().numpy()
+                np.save(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".npy"),pred_np)
+                pred_pc = trimesh.PointCloud(pred_np)
+                pred_pc.export(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".ply"))
+            
     print("Total L1 loss:",total_l1_loss/len(test_loader),"total chamfer loss:",total_chamfer_loss/len(test_loader))
 
 if __name__ == "__main__":
