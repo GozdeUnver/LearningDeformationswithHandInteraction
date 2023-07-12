@@ -216,6 +216,7 @@ def train(args, io,tolerance=100):
     criterion.to(device)
     waiting=0
     train_loss = 0.0
+    best_loss = torch.inf
     train_loss_final=0.
     for epoch in range(args.epochs):
         ####################
@@ -291,14 +292,14 @@ def train(args, io,tolerance=100):
                 print("Validation loss:",loss_val/ len(val_loader))
                 writer.add_scalar('Loss/val', loss_val/ len(val_loader), epoch)
             model.train()
-            if epoch_loss < best_loss:
-                best_loss = epoch_loss
+            if loss_val < best_loss:
+                best_loss = loss_val
                 best_model = model.state_dict()
                 torch.save(best_model, 'outputs/%s/models/best_model.t7' % args.exp_name)
                 waiting = 0
             if waiting >= tolerance > 0:
                 break
-    if epoch%250==0:
+    if epoch%5==0:
             torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
     
     print("Total training loss: ",train_loss_final/args.epochs)
