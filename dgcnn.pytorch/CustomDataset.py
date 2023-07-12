@@ -12,33 +12,39 @@ import pyvista as pv
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self,split,path=None,deformation_path=None,num_points=2048):
         super().__init__()
-        df_temp=pd.read_csv("./data/cube_dataset.csv")
+        df_temp=pd.read_csv("data/cube_dataset.csv")
         if split=="train":
-            df=df_temp.loc[df_temp['train_sample'] == True]
+            df=df_temp.loc[df_temp['set'] == "train"]
+        elif split=="val":
+            df=df_temp.loc[df_temp['set'] == "val"]
         else:
-            df=df_temp.loc[df_temp['train_sample'] == False]
+            df=df_temp.loc[df_temp['set'] == "test"]
+        #df.drop(columns=["Unnamed: 0"],inplace=True)
+        df.reset_index(drop=True,inplace=True)
+        self.input_paths=df["input"].tolist()
+        self.target_paths=df["target"].tolist()
+        self.contact_points=df["contact_vertex"].astype(int).tolist()
 
-        self.input_paths=df["input"]
-        self.target_paths=df["target"]
-        self.contact_points=df["contact_vertex"].astype(int)
+        self.data = []
+        for i in range(len(self)):
+            if i % 100 == 0:
+                print(f'\rPre-loading dataset: {i}/{len(self)}')
+            self.data.append(self._load_item(i))
+
 
         #self.num_points=num_points
         self.seg_num_all = 3
         self.seg_start_index = 0
             
     def __getitem__(self, index):
+        return self.data[index] if self.data is not None else self._load_item(index)
+
+    def _load_item(self, index):
         #index = 0 # THIS IS BECAUSE OF BATCHNORMS - CHANGE WHEN NOT OVERFITTING!
-        #input_mesh=np.asarray(open3d.io.read_point_cloud(self.input_paths[index]).points, dtype=np.float32)
-        #target_mesh=np.asarray(open3d.io.read_point_cloud(self.target_paths[index]).points, dtype=np.float32)
-        #deformed_mesh=np.asarray(open3d.io.read_point_cloud(self.deformation_deformed[index]).points, dtype=np.float32)
-        #non_deformed_mesh=np.asarray(open3d.io.read_point_cloud(self.deformation_nondeformed[index]).points, dtype=np.float32)
-        if self.input_paths[index][-3:]=="obj":
-            input_mesh=np.asarray(o3d.io.read_triangle_mesh(self.input_paths[index]).vertices,dtype=np.float32)
-            target_mesh=np.asarray(o3d.io.read_triangle_mesh(self.target_paths[index]).vertices,dtype=np.float32)
-        else:
-            input_mesh=np.asarray(pv.read(self.input_paths[index]).points,dtype=np.float16)
-            target_mesh=np.asarray(pv.read(self.target_paths[index]).points, dtype=np.float16)
-            contact_point=self.contact_points[index]
+        
+        input_mesh=np.asarray(pv.read(self.input_paths[index]).points,dtype=np.float32)
+        target_mesh=np.asarray(pv.read(self.target_paths[index]).points, dtype=np.float32)
+        contact_point=self.contact_points[index]
        
         
         deformations=np.zeros(input_mesh.shape)

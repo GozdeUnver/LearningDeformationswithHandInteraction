@@ -142,13 +142,16 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
 def train(args, io):
     
     train_dataset=CustomDataset("train") # !!!!!!!!!
+    val_dataset=CustomDataset("val")
     print("args batch size",args.batch_size)
     #train_dataset = ShapeNetPart(partition='trainval', num_points=args.num_points, class_choice=3)
     if (len(train_dataset) < 100):
         drop_last = False
     else:
         drop_last = True
+    print()
     train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
+    val_loader= DataLoader(val_dataset, num_workers=2, batch_size=args.batch_size, shuffle=False, drop_last=drop_last)
     
     #test_loader=CustomDataset("train",2048) ### !!!!!!!!!!!
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice), num_workers=8, batch_size=args.test_batch_size, shuffle=True, drop_last=False)
@@ -261,7 +264,7 @@ def train(args, io):
         train_loss+=epoch_loss
         print("Epoch: ",str(epoch),", current epoch train loss: ",epoch_loss)
         
-        if epoch%250==0:
+        if epoch%5==0:
             torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
     
     print("Total training loss: ",train_loss/args.epochs)
