@@ -142,7 +142,7 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
 
 def train(args, io,tolerance=100):
     log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
-    if not os.exists(log_dir):
+    if not os.path.exists(log_dir):
         os.makedirs(log_dir)
     train_dataset=CustomDataset("train") # !!!!!!!!!
     val_dataset=CustomDataset("val")
@@ -300,7 +300,7 @@ def train(args, io,tolerance=100):
                 waiting = 0
             if waiting >= tolerance > 0:
                 break
-    if epoch%5==0:
+        if epoch%5==0:
             torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
     
     print("Total training loss: ",train_loss_final/args.epochs)
