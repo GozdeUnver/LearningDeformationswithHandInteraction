@@ -287,8 +287,7 @@ def train(args, io,tolerance=100):
                     loss_criterion_val=criterion(seg_pred_val,seg_val)
                     loss=loss_criterion_val
                     loss_val+=loss.item()
-                    loss.backward()
-                    opt.step()
+                    
                 print("Validation loss:",loss_val/ len(val_loader))
                 writer.add_scalar('Loss/val', loss_val/ len(val_loader), epoch)
             model.train()
