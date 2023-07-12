@@ -142,7 +142,8 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
 
 def train(args, io,tolerance=100):
     log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
-
+    if not os.exists(log_dir):
+        os.makedirs(log_dir)
     train_dataset=CustomDataset("train") # !!!!!!!!!
     val_dataset=CustomDataset("val")
     print("args batch size",args.batch_size)
