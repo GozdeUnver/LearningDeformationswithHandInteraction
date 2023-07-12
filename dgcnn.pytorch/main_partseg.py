@@ -140,7 +140,7 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
 
 
-def train(args, io,tolerance=100):
+def train(args, io,tolerance=50):
     log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -193,7 +193,10 @@ def train(args, io,tolerance=100):
     model.module.conv11=nn.Conv1d(128, 3, kernel_size=1, bias=False)
     #print(model)
     #model=nn.Sequential(customHeader,model_pretrained).to(device)
-        
+    if len(args.resume_model_path)>0:
+        print("Resume training from epoch",args.continue_epoch)
+        model.load_state_dict(torch.load(args.resume_model_path,map_location=torch.device(device)))
+    
     model=model.to(device)
     #model = nn.DataParallel(model_pretrained)
     model.train()
@@ -218,8 +221,8 @@ def train(args, io,tolerance=100):
     waiting=0
     train_loss = 0.0
     best_loss = torch.inf
-    train_loss_final=0.
-    for epoch in range(args.epochs):
+    #train_loss_final=0.
+    for epoch in range(args.continue_epoch,args.epochs):
         ####################
         # Train
         ####################
@@ -267,7 +270,7 @@ def train(args, io,tolerance=100):
                     param_group['lr'] = 1e-5
         
         train_loss = epoch_loss / len(train_loader)
-        train_loss_final+=train_loss
+        #train_loss_final+=train_loss
         writer.add_scalar('Loss/train', train_loss, epoch)
         print("Epoch: ",str(epoch),", current epoch train loss: ",train_loss)
         waiting += 1
@@ -301,9 +304,10 @@ def train(args, io,tolerance=100):
             if waiting >= tolerance > 0:
                 break
         if epoch%5==0:
+            print("Saving model")
             torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
     
-    print("Total training loss: ",train_loss_final/args.epochs)
+    #print("Total training loss: ",train_loss_final/args.epochs)
     torch.save(model.state_dict(), 'outputs/%s/models/model_final.t7' % args.exp_name)
 
 def test(args,io):
@@ -352,6 +356,7 @@ def test(args,io):
         
 
     #model = nn.DataParallel(model)
+   
     model.load_state_dict(torch.load(args.model_path,map_location=torch.device(device)))
     model=model.to(device)
     model.eval()
@@ -447,6 +452,10 @@ if __name__ == "__main__":
                         help='file format of visualization')
     parser.add_argument('--predicted_pc', type=str, 
                         help='path of the predicted pointclouds')
+    parser.add_argument('--continue_epoch', type=int, default=0,
+                        help='the number of epoch to continue training')
+    parser.add_argument('--resume_model_path', type=str, default="",
+                        help='the path of the model to resume training on top of it')
     parser.add_argument("--dgcnn_pretrained_model_path",type=str,help="path of the pretrained dgcnn")
     args = parser.parse_args()
 
