@@ -216,6 +216,7 @@ def train(args, io,tolerance=100):
     criterion.to(device)
     waiting=0
     train_loss = 0.0
+    train_loss_final=0.
     for epoch in range(args.epochs):
         ####################
         # Train

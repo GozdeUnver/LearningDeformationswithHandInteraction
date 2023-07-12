@@ -12,7 +12,7 @@ import pyvista as pv
 class CustomDataset(torch.utils.data.Dataset):
     def __init__(self,split,path=None,deformation_path=None,num_points=2048):
         super().__init__()
-        df_temp=pd.read_csv("data/cube_dataset.csv")
+        df_temp=pd.read_csv("data/cube_dataset_original.csv")
         if split=="train":
             df=df_temp.loc[df_temp['set'] == "train"]
         elif split=="val":
@@ -20,7 +20,7 @@ class CustomDataset(torch.utils.data.Dataset):
         else:
             df=df_temp.loc[df_temp['set'] == "test"]
         #df.drop(columns=["Unnamed: 0"],inplace=True)
-        df.reset_index(drop=True,inplace=True)
+        #df.reset_index(drop=True,inplace=True)
         self.input_paths=df["input"].tolist()
         self.target_paths=df["target"].tolist()
         self.contact_points=df["contact_vertex"].astype(int).tolist()
