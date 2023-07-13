@@ -25,6 +25,8 @@ class CubeDataset(torch.utils.data.Dataset):
         self.input_paths=df["input"].tolist()
         self.target_paths=df["target"].tolist()
         self.contact_points=df["contact_vertex"].astype(int).tolist()
+    
+        self.split_vectors = split_vectors
 
         self.data = []
         for i in range(len(self)):
@@ -36,7 +38,6 @@ class CubeDataset(torch.utils.data.Dataset):
         self.seg_num_all = 3
         self.seg_start_index = 0
 
-        self.split_vectors = split_vectors
 
         if preload:
             self.data = []
@@ -65,10 +66,7 @@ class CubeDataset(torch.utils.data.Dataset):
             return (input_mesh, deformations), target_mesh
         else:
             input_mesh = np.concatenate([input_mesh, deformations], axis=1)
-            return inpute_mesh, target_mesh
-
-        return input_mesh, target_mesh
-
+            return input_mesh, target_mesh
     
     def __len__(self):
         return len(self.target_paths)
