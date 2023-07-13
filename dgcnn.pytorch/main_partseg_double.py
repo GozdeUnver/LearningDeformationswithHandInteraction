@@ -23,6 +23,8 @@ from torch.utils.data import DataLoader
 from util import cal_loss, IOStream
 from plyfile import PlyData, PlyElement
 from CubeDataset import CubeDataset
+from pytorch3d.loss import chamfer_distance
+from torch.utils.tensorboard import SummaryWriter
 
 
 global class_cnts
@@ -101,7 +103,7 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
             visual_warning = False
         if skip:
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
-        else:  
+        else:
             if not os.path.exists('outputs/'+args.exp_name+'/'+'visualization'+'/'+classname):
                 os.makedirs('outputs/'+args.exp_name+'/'+'visualization'+'/'+classname)
             for j in range(0, data.shape[2]):
@@ -176,16 +178,22 @@ def create_model_for_train(args):
     return model, opt, scheduler
 
 
-def train(args, io):
+def train(args, io, validate_each=10, tolerance=50):
+    log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
     train_dataset=CubeDataset(split='train', split_vectors=True, preload=True) # !!!!!!!!!
+    val_dataset = CubeDataset(split='val', split_vectors=True, preload=True)
     
     #train_dataset = ShapeNetPart(partition='trainval', num_points=args.num_points, class_choice=3)
     if (len(train_dataset) < 100):
         drop_last = False
     else:
         drop_last = True
+    writer = SummaryWriter(log_dir=log_dir)
     train_loader = DataLoader(train_dataset, num_workers=8, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
     test_loader=train_loader ### !!!!!!!!!!!
+    val_loader = DataLoader(val_dataset, num_workers=2, batch_size=args.batch_size, shuffle=False, drop_last=drop_last)
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice), num_workers=8, batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -215,9 +223,10 @@ def train(args, io):
 
     #criterion = cal_loss
     
-    criterion=nn.L1Loss() #!!!!!!!!!!
+    criterion=nn.L1Loss().to(device) #!!!!!!!!!!
     
     best_test_iou = 0
+    waiting = 0
     for epoch in range(args.epochs):
         ####################
         # Train
@@ -226,15 +235,9 @@ def train(args, io):
         count = 0.0
         model_pos.train()
         model_def.train()
-        train_true_cls = []
-        train_pred_cls = []
-        train_true_target = []
-        train_pred_target = []
-        train_label_target = []
         epoch_loss = 0.
+        best_loss = torch.inf
         for (pos, deform), target in train_loader:
-        #for data_dict in train_loader:
-            #data=data.permute(0, 2, 1)
             target=target.permute(0, 2, 1).float()
             pos = pos.float()
             deform = deform.float()
@@ -246,61 +249,62 @@ def train(args, io):
             pred_def = model_def(deform)
             combined_pred = torch.concat([pred_pos, pred_def], dim=1).permute(0, 2, 1)
             pred = model_combine(combined_pred).permute(0, 2, 1)
-            #seg_pred = seg_pred.permute(0, 2, 1).contiguous()
             loss=criterion(pred,target)
-            #loss = criterion(seg_pred.view(-1, seg_num_all), seg.view(-1,1).squeeze())
             loss.backward()
             opt.step()
             
-            #pred = seg_pred.max(dim=2)[1]               # (batch_size, num_points)
-            
-            
             count += batch_size
-            #train_loss += loss.item() * batch_siz20482048, , e
             curr_loss=loss.item()
             epoch_loss+=curr_loss
-            """seg_np = seg.cpu().numpy(       train_loss = 0.0
-)                  # (batch_size, num_points)
-            pred_np = pred.detach().cpu().numpy()       # (batch_size, num_points)
-            train_true_cls.append(seg_np.reshape(-1))       # (batch_size * num_points)
-            train_pred_cls.append(pred_np.reshape(-1))      # (batch_size * num_points)
-            train_true_seg.append(seg_np)
-            train_pred_seg.append(pred_np)
-            train_label_seg.append(label.reshape(-1))"""
             
-        if args.scheduler == 'cos':
-            scheduler.step()
-        elif args.scheduler == 'step':
-            if opt.param_groups[0]['lr'] > 1e-5:
-                scheduler.step()
-            if opt.param_groups[0]['lr'] < 1e-5:
-                for param_group in opt.param_groups:
-                    param_group['lr'] = 1e-5
-        """train_true_cls = np.concatenate(train_true_cls)
-        train_pred_cls = np.concatenate(train_pred_cls)
-        train_acc = metrics.accuracy_score(train_true_cls, train_pred_cls)
-        avg_per_class_acc = metrics.balanced_accuracy_score(train_true_cls, train_pred_cls)
-        train_true_seg = np.concatenate(train_true_seg, axis=0)
-        train_pred_seg = np.concatenate(train_pred_seg, axis=0)
-        train_label_seg = np.concatenate(train_label_seg)
-        train_ious = calculate_shape_IoU(train_pred_seg, train_true_seg, train_label_seg, args.class_choice)
-        outstr = 'Train %d, loss: %.6f, train acc: %.6f, train avg acc: %.6f, train iou: %.6f' % (epoch, 
-                                                                                                  train_loss*1.0/count,
-                                                                                                  train_acc,
-                                                                                                  avg_per_class_acc,
-                                                      2048,                                             np.mean(train_ious))
-        io.cprint(outstr)"""
+        train_loss = epoch_loss / len(train_loader)
+        writer.add_scalar('Loss/train', train_loss, epoch)
         print("Epoch: ",str(epoch),", current epoch train loss: ",epoch_loss)
-        train_loss+=epoch_loss
-        if epoch%50==0:
-            torch.save(model_pos.state_dict(), 'outputs/%s/models/model_pos_%s.t7' % (args.exp_name, str(epoch)))
-            torch.save(model_def.state_dict(), 'outputs/%s/models/model_def_%s.t7' % (args.exp_name, str(epoch)))
-            torch.save(model_combine.state_dict(), 'outputs/%s/models/model_combine_%s.t7' % (args.exp_name, str(epoch)))
+        waiting += 1
+        if epoch % validate_each == 0:
+            model_pos.eval()
+            model_def.eval()
+            model_combine.eval()
+            print('Validation starts...')
+            with torch.no_grad():
+                loss_val = 0.
+                chamfer_val = 0.
+                for (pos, deform), target in train_loader:
+                    target=target.permute(0, 2, 1).float()
+                    pos = pos.float()
+                    deform = deform.float()
+                    pos, deform, target = pos.to(device), deform.to(device), target.to(device)
+                    
+                    batch_size = pos.size()[0]
+                    pred_pos = model_pos(pos)
+                    pred_def = model_def(deform)
+                    combined_pred = torch.concat([pred_pos, pred_def], dim=1).permute(0, 2, 1)
+                    pred = model_combine(combined_pred).permute(0, 2, 1)
+                    loss=criterion(pred,target)
+                    loss_val += loss.item()
+                    chamfer, _ = chamfer_distance(pred, target)
+                    chamfer_val += chamfer
+                loss_val /= len(val_loader)
+                chamfer_val /= len(val_loader)
+                print("Validation L1 loss:", loss_val)
+                writer.add_scalar('Loss/val/L1', loss_val, epoch)
+                print("Validation Chamfer distance:", chamfer_val)
+                writer.add_scalar('Loss/val/Chamfer', chamfer_val, epoch)
+            model_pos.train()
+            model_def.train()
+            model_combine.train()
+            if loss_val < best_loss:
+                best_loss = loss_val
+                torch.save(model_pos.state_dict(), f'outputs/{args.exp_name}/models/model_pos_{epoch}.t7')
+                torch.save(model_def.state_dict(), f'outputs/{args.exp_name}/models/model_def_{epoch}.t7')
+                torch.save(model_combine.state_dict(), f'outputs/{args.exp_name}/models/model_combine_{epoch}.t7')
+                torch.save(model_pos.state_dict(), f'outputs/{args.exp_name}/models/model_pos_final.t7')
+                torch.save(model_def.state_dict(), f'outputs/{args.exp_name}/models/model_def_final.t7')
+                torch.save(model_combine.state_dict(), f'outputs/{args.exp_name}/models/model_combine_final.t7')
+
+            if waiting == tolerance:
+                break
     
-    print("Total training loss: ",train_loss/args.epochs)
-    torch.save(model_pos.state_dict(), 'outputs/%s/models/model_pos_final.t7' % args.exp_name)
-    torch.save(model_def.state_dict(), 'outputs/%s/models/model_def_final.t7' % args.exp_name)
-    torch.save(model_combine.state_dict(), 'outputs/%s/models/model_combine_final.t7' % args.exp_name)
 
 def create_model_for_test(args, model_num: int):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
