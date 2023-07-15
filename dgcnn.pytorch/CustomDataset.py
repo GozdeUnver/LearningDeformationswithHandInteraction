@@ -31,6 +31,7 @@ class CustomDataset(torch.utils.data.Dataset):
                 print(f'\rPre-loading dataset: {i}/{len(self)}')
             self.data.append(self._load_item(i))
 
+
         #self.num_points=num_points
         self.seg_num_all = 3
         self.seg_start_index = 0

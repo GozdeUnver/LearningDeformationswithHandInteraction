@@ -3,6 +3,7 @@ pyFM
 .vscode
 .DS_Store
 meshGNN/outputs
+dgcnn.pytorch/data
 cube.zip
 *__pycache__*
 dgcnn.pytorch/data/

@@ -274,7 +274,7 @@ def train(args, io,tolerance=50):
         print("Epoch: ",str(epoch),", current epoch train loss: ",train_loss)
         waiting += 1
         
-        if epoch>0 and epoch%50==0:
+        if epoch>0 and epoch%args.validate_every_n==0:
             
             model.eval()
             print("Validation starts...")
@@ -301,6 +301,7 @@ def train(args, io,tolerance=50):
                 torch.save(best_model, 'outputs/%s/models/best_model.t7' % args.exp_name)
                 waiting = 0
             if waiting >= tolerance > 0:
+                print("Early stopping, training ends here. Epoch:",epoch)
                 break
         if epoch%5==0:
             print("Saving model")
@@ -394,7 +395,7 @@ def test(args,io):
             seg_pred=seg_pred.permute(0,2,1)
             for i in range(seg_pred.size()[0]):
                 pred_np = seg_pred[i].detach().cpu().numpy()
-                np.save(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".npy"),pred_np)
+                #np.save(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".npy"),pred_np)
                 pred_pc = trimesh.PointCloud(pred_np)
                 pred_pc.export(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".ply"))
             
@@ -456,6 +457,7 @@ if __name__ == "__main__":
     parser.add_argument('--resume_model_path', type=str, default="",
                         help='the path of the model to resume training on top of it')
     parser.add_argument("--dgcnn_pretrained_model_path",type=str,help="path of the pretrained dgcnn")
+    parser.add_argument("--validate_every_n",type=int,default=5,help="validate every nth epoch")
     args = parser.parse_args()
 
     _init_()
