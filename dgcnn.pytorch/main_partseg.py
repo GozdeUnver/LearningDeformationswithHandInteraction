@@ -16,6 +16,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim.lr_scheduler import CosineAnnealingLR, StepLR
+from data import ShapeNetPart
 from model import DGCNN_partseg,CustomHeader
 import numpy as np
 from torch.utils.data import DataLoader
@@ -139,7 +140,7 @@ def visualization(visu, visu_format, data, pred, seg, label, partseg_colors, cla
             class_indexs[int(label[i])] = class_indexs[int(label[i])] + 1
 
 
-def train(args, io,tolerance=50):
+def train(args, io,tolerance=100):
     log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
@@ -192,10 +193,14 @@ def train(args, io,tolerance=50):
     model.module.conv11=nn.Conv1d(128, 3, kernel_size=1, bias=False)
     #print(model)
     #model=nn.Sequential(customHeader,model_pretrained).to(device)
+    waiting=0
+    checkpoint=None
     if len(args.resume_model_path)>0:
+        checkpoint = torch.load(args.resume_model_path,map_location=torch.device(device))
         print("Resume training from epoch",args.continue_epoch)
-        model.load_state_dict(torch.load(args.resume_model_path,map_location=torch.device(device)))
-    
+        model.load_state_dict(checkpoint["model_state_dict"])
+        waiting=checkpoint["waiting"]
+
     model=model.to(device)
     #model = nn.DataParallel(model_pretrained)
     model.train()
@@ -208,6 +213,9 @@ def train(args, io,tolerance=50):
         print("Use Adam")
         opt = optim.Adam(model.parameters(), lr=args.lr, weight_decay=1e-4)
 
+    if len(args.resume_model_path)>0:
+        opt.load_state_dict(checkpoint['optimizer_state_dict'])
+
     if args.scheduler == 'cos':
         scheduler = CosineAnnealingLR(opt, args.epochs, eta_min=1e-3)
     elif args.scheduler == 'step':
@@ -217,16 +225,18 @@ def train(args, io,tolerance=50):
     
     criterion=nn.L1Loss() #!!!!!!!!!!
     criterion.to(device)
-    waiting=0
+    
     train_loss = 0.0
     best_loss = torch.inf
     #train_loss_final=0.
+    print("Chamfer distance is used")
     for epoch in range(args.continue_epoch,args.epochs):
         ####################
         # Train
         ####################
         count = 0.0
         epoch_loss=0.
+        
         for data,seg in train_loader:
         #for data_dict in train_loader:
             #data=data.permute(0, 2, 1)
@@ -241,10 +251,10 @@ def train(args, io,tolerance=50):
             opt.zero_grad()
             seg_pred = model(data)
             #seg_pred = seg_pred.permute(0, 2, 1).contiguous()
-            loss_criterion=criterion(seg_pred,seg)
-            #loss_chamfer,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
+            #loss_criterion=criterion(seg_pred,seg)
+            loss_chamfer,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
             #loss=loss_chamfer+loss_criterion
-            loss=loss_criterion
+            loss=loss_chamfer
             #loss = criterion(seg_pred.view(-1, seg_num_all), seg.view(-1,1).squeeze())
             
             loss.backward()
@@ -254,7 +264,8 @@ def train(args, io,tolerance=50):
             
             
             #train_loss += loss.item() * batch_size
-            curr_loss=loss.item()
+            #curr_loss=loss.item()
+            curr_loss=loss.detach().cpu().item()
             epoch_loss+=curr_loss
        
             count+=batch_size
@@ -271,9 +282,11 @@ def train(args, io,tolerance=50):
         train_loss = epoch_loss / len(train_loader)
         #train_loss_final+=train_loss
         writer.add_scalar('Loss/train', train_loss, epoch)
-        print("Epoch: ",str(epoch),", current epoch train loss: ",train_loss)
         waiting += 1
+        print("Epoch: ",str(epoch),", current epoch train loss: ",train_loss)
         
+        
+
         if epoch>0 and epoch%args.validate_every_n==0:
             
             model.eval()
@@ -288,9 +301,13 @@ def train(args, io,tolerance=50):
                     batch_size = data_val.size()[0]
                     seg_pred_val = model(data_val)
                     opt.zero_grad()
-                    loss_criterion_val=criterion(seg_pred_val,seg_val)
-                    loss=loss_criterion_val
-                    loss_val+=loss.item()
+                    loss_chamfer_val,_=chamfer_distance(seg_val.permute(0, 2, 1),seg_pred_val.permute(0, 2, 1))
+            
+                    loss=loss_chamfer_val
+                    #loss_criterion_val=criterion(seg_pred_val,seg_val)
+                    #loss=loss_criterion_val
+                    #loss_val+=loss.item()
+                    loss_val+=loss.detach().cpu().item()
                     
                 print("Validation loss:",loss_val/ len(val_loader))
                 writer.add_scalar('Loss/val', loss_val/ len(val_loader), epoch)
@@ -298,14 +315,25 @@ def train(args, io,tolerance=50):
             if loss_val < best_loss:
                 best_loss = loss_val
                 best_model = model.state_dict()
-                torch.save(best_model, 'outputs/%s/models/best_model.t7' % args.exp_name)
                 waiting = 0
+                torch.save({
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': opt.state_dict(),"waiting":waiting}, 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
+                
             if waiting >= tolerance > 0:
                 print("Early stopping, training ends here. Epoch:",epoch)
+                print("Saving model")
+                torch.save({
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': opt.state_dict(),"waiting":waiting}, 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
                 break
+        writer.add_scalar("Waiting",waiting,epoch)
         if epoch%5==0:
             print("Saving model")
-            torch.save(model.state_dict(), 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
+            torch.save({
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': opt.state_dict(),"waiting":waiting}, 'outputs/%s/models/model%s.t7' % (args.exp_name,"_"+str(epoch)))
+            
     
     #print("Total training loss: ",train_loss_final/args.epochs)
     torch.save(model.state_dict(), 'outputs/%s/models/model_final.t7' % args.exp_name)
@@ -336,10 +364,10 @@ def test(args,io):
     model = nn.DataParallel(model)
 
     print(args.model_path)
-    model.load_state_dict(torch.load(args.dgcnn_pretrained_model_path,map_location=torch.device(device)))
+    
     #customHeader=CustomHeader(args).to(device)
     #customHeader=nn.DataParallel(customHeader)
-    
+    model.load_state_dict(torch.load(args.dgcnn_pretrained_model_path,map_location=torch.device(device)))
     model.module.conv1=nn.Sequential(nn.Conv2d(12, 64, kernel_size=1, bias=False),
                                    nn.BatchNorm2d(64),
                                    nn.LeakyReLU(negative_slope=0.2))
@@ -356,8 +384,9 @@ def test(args,io):
         
 
     #model = nn.DataParallel(model)
-   
-    model.load_state_dict(torch.load(args.model_path,map_location=torch.device(device)))
+    checkpoint = torch.load(args.model_path,map_location=torch.device(device))
+    
+    model.load_state_dict(checkpoint["model_state_dict"])
     model=model.to(device)
     model.eval()
 
@@ -395,7 +424,6 @@ def test(args,io):
             seg_pred=seg_pred.permute(0,2,1)
             for i in range(seg_pred.size()[0]):
                 pred_np = seg_pred[i].detach().cpu().numpy()
-                #np.save(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".npy"),pred_np)
                 pred_pc = trimesh.PointCloud(pred_np)
                 pred_pc.export(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".ply"))
             
