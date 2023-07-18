@@ -25,6 +25,7 @@ from plyfile import PlyData, PlyElement
 from CubeDataset import CubeDataset
 from pytorch3d.loss import chamfer_distance
 from torch.utils.tensorboard import SummaryWriter
+import trimesh as tm
 
 
 global class_cnts
@@ -153,8 +154,9 @@ def create_model_for_train(args):
     #print(str(model))
     model = nn.DataParallel(model)
 
-    print(args.dgcnn_pretrained_model_path)
-    model.load_state_dict(torch.load(args.dgcnn_pretrained_model_path,map_location=torch.device(device)))
+    if not args.continue_train:
+        print(args.dgcnn_pretrained_model_path)
+        model.load_state_dict(torch.load(args.dgcnn_pretrained_model_path,map_location=torch.device(device)))
     #customHeader=CustomHeader(args).to(device)
     #customHeader=nn.DataParallel(customHeader)
 
@@ -206,6 +208,10 @@ def train(args, io, validate_each=10, tolerance=50):
     model_combine = nn.Sequential(
         nn.Linear(6, 3)
     ).to(device)
+    if args.continue_train:
+        model_pos.load_state_dict(torch.load(os.path.join('outputs', args.exp_name, 'models', 'model_pos_final.t7'), map_location=torch.device(device)))
+        model_def.load_state_dict(torch.load(os.path.join('outputs', args.exp_name, 'models', 'model_def_final.t7'), map_location=torch.device(device)))
+        model_combine.load_state_dict(torch.load(os.path.join('outputs', args.exp_name, 'models', 'model_combine_final.t7'), map_location=torch.device(device)))
 
     parameters = list(model_pos.parameters()) + list(model_def.parameters()) + list(model_combine.parameters())
 
@@ -221,13 +227,11 @@ def train(args, io, validate_each=10, tolerance=50):
     elif args.scheduler == 'step':
         scheduler = StepLR(opt, step_size=20, gamma=0.5)
 
-    #criterion = cal_loss
-    
     criterion=nn.L1Loss().to(device) #!!!!!!!!!!
     
     best_test_iou = 0
     waiting = 0
-    for epoch in range(args.epochs):
+    for epoch in range(args.start_epoch, args.epochs):
         ####################
         # Train
         ####################
@@ -301,9 +305,12 @@ def train(args, io, validate_each=10, tolerance=50):
                 torch.save(model_pos.state_dict(), f'outputs/{args.exp_name}/models/model_pos_final.t7')
                 torch.save(model_def.state_dict(), f'outputs/{args.exp_name}/models/model_def_final.t7')
                 torch.save(model_combine.state_dict(), f'outputs/{args.exp_name}/models/model_combine_final.t7')
+                waiting = 0
 
-            if waiting == tolerance:
+            if waiting >= tolerance:
                 break
+        
+        scheduler.step()
     
 
 def create_model_for_test(args, model_num: int):
@@ -358,23 +365,7 @@ def test(args,io):
     ).to(device)
     model_combine.load_state_dict(torch.load(args.model_combine_path, map_location=torch.device(device)))
     
-    target_start_index = test_loader.dataset.target_start_index
-    target_num_all=3 ### !!!!!!!!!!!!
-    class_nums=1
-    
-    target_num_all = test_loader.dataset.target_num_all
-    #partseg_colors = test_loader.dataset.partseg_colors
-    
-
     test_loss=0.
-    
-    test_acc = 0.0
-    count = 0.0
-    test_true_cls = []
-    test_pred_cls = []
-    test_true_target = []
-    test_pred_target = []
-    test_label_target = []
     test_num=0
     criterion=nn.L1Loss()
     if not os.path.exists(args.predicted_pc):
@@ -384,61 +375,30 @@ def test(args,io):
         target = target.permute(0, 2, 1).float()
         pos = pos.float()
         deform = deform.float()
-        """label_one_hot = np.zeros((label.shape[0], 16))
-        for idx in range(label.shape[0]):
-            label_one_hot[idx, label[idx]] = 1
-        label_one_hot = torch.from_numpy(label_one_hot.astype(np.float32))
-        data, label_one_hot, seg = data.to(device), label_one_hot.to(device), seg.to(device)"""
-        
-        #data = data.permute(0, 2, 1)
         
         pos, deform, target = pos.to(device), deform.to(device), target.to(device)
             
-        target = target - target_start_index
         batch_size = pos.size()[0]
         pred_pos = model_pos(pos)
         pred_def = model_def(deform)
         combined_pred = torch.concat([pred_pos, pred_def], dim=1).permute(0, 2, 1)
-        pred = model_combine(combined_pred).permute(0, 2048, 2, 1)
+        pred = model_combine(combined_pred).permute(0, 2, 1)
         
         loss=criterion(pred,target)
         
         curr_loss=loss.item()
-        print("Test loss for the batch: ",curr_loss)
+        print(f'Test loss for the batch {test_num}: {curr_loss}')
+        test_loss += curr_loss
         pred=pred.permute(0,2,1)
+
         for i in range(pred.size()[0]):
             pred_np = pred[i].detach().cpu().numpy()
             np.save(os.path.join(args.predicted_pc,str(test_num)+"_"+str(i)+".npy"),pred_np)
-            pred_pc = trimesh.PointCloud(pred_np)
+            pred_pc = tm.PointCloud(pred_np)
             pred_pc.export(os.path.join(args.predicted_pc,str(test_num)+"_"+str(i)+".ply"))
-        """seg_pred = seg_pred.permute(0, 2, 1).contiguous()
-        pred = seg_pred.max(dim=2)[1]
-        seg_np = seg.cpu().numpy()
-        pred_np = pred.detach().cpu().numpy()
-        test_true_cls.append(seg_np.reshape(-1))
-        test_pred_cls.append(pred_np.reshape(-1))
-        test_true_seg.append(seg_np)
-        test_pred_seg.append(pred_np)
-        test_label_seg.append(label.reshape(-1))"""
-        
-        
-        # visiualization
-        #visualization(args.visu, args.visu_format, data, pred, seg, label, partseg_colors, args.class_choice) 
-    """if visual_warning and args.visu != '':
-        print('Visualization Failed: You can only choose a point cloud shape to visualize within the scope of the test class')
-        
-    test_true_cls = np.concatenate(test_true_cls)
-    test_pred_cls = np.concatenate(test_pred_cls)
-    test_acc = metrics.accuracy_score(test_true_cls, test_pred_cls)
-    avg_per_class_acc = metrics.balanced_accuracy_score(test_true_cls, test_pred_cls)
-    test_true_seg = np.concatenate(test_true_seg, axis=0)
-    test_pred_seg = np.concatenate(test_pred_seg, axis=0)
-    test_label_seg = np.concatenate(test_label_seg)
-    test_ious = calculate_shape_IoU(test_pred_seg, test_true_seg, test_label_seg, args.class_choice)
-    outstr = 'Test :: test acc: %.6f, test avg acc: %.6f, test iou: %.6f' % (test_acc,
-                                                                             avg_per_class_acc,
-                                                                             np.mean(test_ious))
-    io.cprint(outstr)"""
+        test_num += 1
+    
+    print('Average test loss: ' + str(test_loss / len(test_loader)))
 
 
 if __name__ == "__main__":
@@ -459,6 +419,7 @@ if __name__ == "__main__":
                         help='Size of batch)')
     parser.add_argument('--test_batch_size', type=int, default=16, metavar='batch_size',
                         help='Size of batch)')
+    parser.add_argument('--start_epoch', type=int, default=0, metavar='start_epoch')
     parser.add_argument('--epochs', type=int, default=200, metavar='N',
                         help='number of episode to train ')
     parser.add_argument('--use_sgd', type=bool, default=True,
@@ -497,6 +458,7 @@ if __name__ == "__main__":
     parser.add_argument('--predicted_pc', type=str, 
                         help='path of the predicted pointclouds')
     parser.add_argument("--dgcnn_pretrained_model_path",type=str,help="path of the pretrained dgcnn")
+    parser.add_argument("--continue_train", type=bool, default=False)
     args = parser.parse_args()
 
     _init_()
