@@ -336,7 +336,8 @@ def train(args, io,tolerance=100):
             
     
     #print("Total training loss: ",train_loss_final/args.epochs)
-    torch.save(model.state_dict(), 'outputs/%s/models/model_final.t7' % args.exp_name)
+    torch.save({'model_state_dict': model.state_dict(),'optimizer_state_dict': opt.state_dict(),"waiting":waiting}, 'outputs/%s/models/model_final.t7' % args.exp_name)
+            
 
 def test(args,io):
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),batch_size=args.test_batch_size, shuffle=True, drop_last=False)
