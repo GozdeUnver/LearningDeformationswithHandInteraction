@@ -7,17 +7,19 @@ import open3d as o3d
 
 from torch import optim
 from torch_geometric.loader import DataLoader
+from torch.utils.tensorboard import SummaryWriter
 
 from CubeDataset import CubeDataset
 from model import MeshGNN
 
 from pytorch3d.loss import chamfer_distance
 
+
 Vec3d = o3d.utility.Vector3dVector
 Vec3i = o3d.utility.Vector3iVector
 
 
-CONFIG_NAME = 'sageconv_cube_2xsageconv'
+CONFIG_NAME = 'multilayer_full'
 
 outputs_folder_path = os.path.join('outputs', CONFIG_NAME)
 models_folder_path = os.path.join(outputs_folder_path, 'models')
@@ -55,6 +57,8 @@ def prepare_graph(graph):
     )
 
 def train(epochs = 1000, tolerance=0, lr=0.01, eval_each=10):
+    writer = SummaryWriter(log_dir=os.path.join(outputs_folder_path, 'logs'))
+
     model = MeshGNN().to(device)
 
     best_loss = torch.inf
@@ -89,6 +93,7 @@ def train(epochs = 1000, tolerance=0, lr=0.01, eval_each=10):
         waiting += 1
         epoch_loss /= count
         print(f'Epoch {epoch}: Loss={epoch_loss}')
+        writer.add_scalar('Loss/train', epoch_loss, epoch)
 
         if epoch % eval_each == 0:
             print('Validation started')
@@ -115,7 +120,7 @@ def train(epochs = 1000, tolerance=0, lr=0.01, eval_each=10):
 
                 model.train()
 
-                if epoch_loss < best_loss:
+                if loss_val < best_loss:
                     best_loss = epoch_loss
                     best_model = model.state_dict()
                     model_file_path = os.path.join(models_folder_path, f'model_{epoch}.t7')
@@ -125,6 +130,9 @@ def train(epochs = 1000, tolerance=0, lr=0.01, eval_each=10):
                     print(f'L1 Loss = {loss_val}; Chamfer Distance = {chamfer_val} - New Best!')
                 else:
                     print(f'L1 Loss = {loss_val}; Chamfer Distance = {chamfer_val}')
+
+                writer.add_scalar('Loss/val/l1', loss_val, epoch)
+                writer.add_scalar('Loss/val/chamfer', loss_val, epoch)
         
         if waiting >= tolerance > 0:
             break
@@ -164,5 +172,5 @@ def test(save_targets=False):
                 o3d.io.write_triangle_mesh(mesh_file_path, pred_mesh)
 
 if __name__ == '__main__':
-    # train(epochs=3000, tolerance=100)
+    train(epochs=3000, tolerance=100)
     test(save_targets=True)
