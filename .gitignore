@@ -6,4 +6,5 @@ meshGNN/outputs
 dgcnn.pytorch/data
 cube.zip
 *__pycache__*
-dgcnn.pytorch/data/cube
+dgcnn.pytorch/data/
+dgcnn.pytorch/outputs/
