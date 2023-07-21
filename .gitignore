@@ -10,4 +10,5 @@ dgcnn.pytorch/data/*
 !dgcnn.pytorch/data/duck_dataset.csv
 cube.zip
 *__pycache__*
-dgcnn.pytorch/data/cube
+dgcnn.pytorch/data/
+dgcnn.pytorch/outputs/
