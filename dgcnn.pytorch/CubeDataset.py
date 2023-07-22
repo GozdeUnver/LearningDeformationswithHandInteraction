@@ -11,7 +11,7 @@ import pyvista as pv
 
 
 class CubeDataset(torch.utils.data.Dataset):
-    def __init__(self, split, split_vectors=False, preload=False):
+    def __init__(self, split, split_vectors=False, preload=True):
         super().__init__()
         df_temp=pd.read_csv("data/cube_dataset_original.csv")
         if split=="train":
@@ -28,17 +28,8 @@ class CubeDataset(torch.utils.data.Dataset):
     
         self.split_vectors = split_vectors
 
-        self.data = []
-        for i in range(len(self)):
-            if i % 100 == 0:
-                print(f'\rPre-loading dataset: {i}/{len(self)}')
-            self.data.append(self._load_item(i))
-
-
-        #self.num_points=num_points
         self.seg_num_all = 3
         self.seg_start_index = 0
-
 
         if preload:
             self.data = []
