@@ -365,7 +365,8 @@ def test(args,io):
     ).to(device)
     model_combine.load_state_dict(torch.load(args.model_combine_path, map_location=torch.device(device)))
     
-    test_loss=0.
+    test_loss_l1 = 0.
+    test_loss_chamfer = 0.
     test_num=0
     criterion=nn.L1Loss()
     if not os.path.exists(args.predicted_pc):
@@ -386,9 +387,12 @@ def test(args,io):
         
         loss=criterion(pred,target)
         
-        curr_loss=loss.item()
-        print(f'Test loss for the batch {test_num}: {curr_loss}')
-        test_loss += curr_loss
+        curr_loss_l1 = criterion(pred, target).item()
+        curr_loss_chamfer, _ = chamfer_distance(pred, target)
+        curr_loss_chamfer = curr_loss_chamfer.item()
+        print(f'Test loss for the batch {test_num}: L1={curr_loss_l1}, Chamfer Distance={curr_loss_chamfer}')
+        test_loss_l1 += curr_loss_l1
+        test_loss_chamfer += curr_loss_chamfer
         pred=pred.permute(0,2,1)
 
         for i in range(pred.size()[0]):
@@ -398,7 +402,9 @@ def test(args,io):
             pred_pc.export(os.path.join(args.predicted_pc,str(test_num)+"_"+str(i)+".ply"))
         test_num += 1
     
-    print('Average test loss: ' + str(test_loss / len(test_loader)))
+    test_loss_l1 /= len(test_loader)
+    test_loss_chamfer /= len(test_loader)
+    print(f'Average test loss: L1={test_loss_l1}, Chamfer Distance={test_loss_chamfer}')
 
 
 if __name__ == "__main__":
