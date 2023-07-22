@@ -7,3 +7,5 @@ cube.zip
 *__pycache__*
 dgcnn.pytorch/data/
 dgcnn.pytorch/outputs/
+logs_csv
+plots
