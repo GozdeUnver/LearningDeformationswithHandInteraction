@@ -1,10 +1,14 @@
 leo_meshes.zip
 pyFM
 .vscode
+dgcnn.pytorch/predictions
+dgcnn.pytorch/predictions.zip
 .DS_Store
 .vscode
 meshGNN/outputs
-dgcnn.pytorch/data
+dgcnn.pytorch/data/*
+!dgcnn.pytorch/data/cube_dataset_original.csv
+!dgcnn.pytorch/data/duck_dataset.csv
 cube.zip
 *__pycache__*
 dgcnn.pytorch/data/
