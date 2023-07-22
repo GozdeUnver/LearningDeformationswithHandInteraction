@@ -23,7 +23,7 @@ from torch.utils.data import DataLoader
 from util import cal_loss, IOStream
 import sklearn.metrics as metrics
 from plyfile import PlyData, PlyElement
-from CustomDataset import CustomDataset
+from CubeDataset import CubeDataset
 global class_cnts
 class_indexs = np.zeros((16,), dtype=int)
 global visual_warning
@@ -144,8 +144,8 @@ def train(args, io,tolerance=100):
     log_dir = os.path.join(f'outputs/{args.exp_name}/models/', "logs")
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
-    train_dataset=CustomDataset("train") # !!!!!!!!!
-    val_dataset=CustomDataset("val")
+    train_dataset=CubeDataset("train") # !!!!!!!!!
+    val_dataset=CubeDataset("val")
     print("args batch size",args.batch_size)
     #train_dataset = ShapeNetPart(partition='trainval', num_points=args.num_points, class_choice=3)
     if (len(train_dataset) < 100):
@@ -156,7 +156,7 @@ def train(args, io,tolerance=100):
     train_loader = DataLoader(train_dataset, num_workers=2, batch_size=args.batch_size, shuffle=True, drop_last=drop_last)
     val_loader= DataLoader(val_dataset, num_workers=2, batch_size=args.batch_size, shuffle=False, drop_last=drop_last)
     
-    #test_loader=CustomDataset("train",2048) ### !!!!!!!!!!!
+    #test_loader=CubeDataset("train",2048) ### !!!!!!!!!!!
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice), num_workers=8, batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
     device = torch.device("cuda" if args.cuda else "cpu")
@@ -341,7 +341,7 @@ def train(args, io,tolerance=100):
 def test(args,io):
     #test_loader = DataLoader(ShapeNetPart(partition='test', num_points=args.num_points, class_choice=args.class_choice),batch_size=args.test_batch_size, shuffle=True, drop_last=False)
     
-    test_dataset=CustomDataset("test")
+    test_dataset=CubeDataset("test")
     test_loader = DataLoader(test_dataset, num_workers=8,batch_size=args.test_batch_size, shuffle=False, drop_last=False)
     
     
