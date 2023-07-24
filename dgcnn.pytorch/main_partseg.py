@@ -30,7 +30,7 @@ visual_warning = True
 import trimesh
 from pytorch3d.loss import chamfer_distance
 from torch.utils.tensorboard import SummaryWriter
-
+import time
 class_choices = ['airplane', 'bag', 'cap', 'car', 'chair', 'earphone', 'guitar', 'knife', 'lamp', 'laptop', 'motorbike', 'mug', 'pistol', 'rocket', 'skateboard', 'table']
 seg_num = [4, 2, 2, 4, 4, 3, 3, 2, 4, 2, 6, 2, 3, 3, 3, 3]
 index_start = [0, 4, 6, 8, 12, 16, 19, 22, 24, 28, 30, 36, 38, 41, 44, 47]
@@ -344,7 +344,7 @@ def test(args,io):
     total_l2_loss=0.
     total_chamfer_loss=0.
     count = 0
-    
+    t=0.
     #criterion=nn.L1Loss()
     criterion=nn.MSELoss()
     criterion.to(device)
@@ -359,8 +359,9 @@ def test(args,io):
             data,seg = data.to(device), seg.to(device)
             count+=1 
             batch_size = data.size()[0]
+            start = time.time()
             seg_pred = model(data)
-            
+            end = time.time()
             
             loss_criterion=criterion(seg_pred,seg)
             loss_chamfer_,_=chamfer_distance(seg.permute(0, 2, 1),seg_pred.permute(0, 2, 1))
@@ -378,7 +379,11 @@ def test(args,io):
                 pred_pc.export(os.path.join(args.predicted_pc,str(count)+"_"+str(i)+".ply"))
             
     print("L2 loss for test set:",total_l2_loss/len(test_loader),"Chamfer loss for test set:",total_chamfer_loss/len(test_loader))
-
+    print(
+        "Inference time is {} ms per image.".format(
+            round(t/len(test_loader.dataset)*1000)
+        )
+    )
 if __name__ == "__main__":
     # Training settings
     parser = argparse.ArgumentParser(description='Point Cloud Part Segmentation')
