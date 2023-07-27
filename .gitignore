@@ -4,6 +4,7 @@ pyFM
 dgcnn.pytorch/predictions
 dgcnn.pytorch/predictions.zip
 .DS_Store
+.vscode
 meshGNN/outputs
 dgcnn.pytorch/data/*
 !dgcnn.pytorch/data/cube_dataset_original.csv
@@ -12,3 +13,5 @@ cube.zip
 *__pycache__*
 dgcnn.pytorch/data/
 dgcnn.pytorch/outputs/
+logs_csv
+plots

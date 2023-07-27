@@ -21,14 +21,11 @@ def get_graph_from_mesh(mesh):
 
 
 class CubeDataset(torch.utils.data.Dataset):
-    def __init__(self,split,preload=False, path=None,deformation_path=None,num_points=2048):
+    def __init__(self,split,preload=False):
         super().__init__()
-        df_temp=pd.read_csv('data/cube_dataset.csv')
+        df_temp=pd.read_csv('data/cube_dataset_original.csv')
         self.split = split
-        if split=="train":
-            df=df_temp.loc[df_temp['train_sample'] == True]
-        else:
-            df=df_temp.loc[df_temp['train_sample'] != True]
+        df = df_temp.loc[df_temp['set'] == split]
         
         df.reset_index(drop=True,inplace=True)
         self.input_paths=df.input.tolist()
