@@ -1,0 +1,6 @@
+Result rendering files
+- these are just for rendering a sequence of .stl/.obj files as might be produced by a GNN
+- the .blend file contains a simple setup with a light and a camera that is coupled with an 'empty' -- to move the camera, move the empty
+- render_*_seq.py files load all files into setup, and apply keyframes so that each is only shown for a frame
+- will want to render after baking animation
+- the resulting rendered file can be converted to a .gif with the gif_conv file
