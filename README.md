@@ -1,5 +1,5 @@
 ## Learning Deformations with Hand Interaction Project
-- Correspondences are found by using [pyFM](https://github.com/RobinMagnet/pyFM).
+- The code for the project can be found under the directory dgcnn.pytorch. The original DGCNN is adpted for our project. Correspondences are found by using [pyFM](https://github.com/RobinMagnet/pyFM).
 
 ### Non-deformed-to-Deformed Corresponsences
 This directory contains the mapping from the non-deformed mesh to the deformed mesh. 
